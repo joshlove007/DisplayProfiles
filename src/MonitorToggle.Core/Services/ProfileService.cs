@@ -18,6 +18,24 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
 
     public void Reload() => Data = store.Load();
 
+    /// <summary>
+    /// First run only (no profiles file yet): creates starting profiles from the legacy toggle script if it is
+    /// found, otherwise a single profile capturing the current layout.
+    /// </summary>
+    public bool SeedIfFirstRun(string legacyFolder)
+    {
+        if (File.Exists(store.FilePath))
+        {
+            return false;
+        }
+
+        var live = CaptureLayout();
+        var imported = Integration.LegacyImporter.TryImport(legacyFolder, live);
+        IReadOnlyList<Profile> seeded = imported.Count > 0 ? imported : [Profile.Create("Current layout", live)];
+        Update(d => d with { Profiles = seeded });
+        return true;
+    }
+
     public void Update(Func<ProfileData, ProfileData> change)
     {
         // Re-read first so a CLI invocation never overwrites edits made by the GUI process.

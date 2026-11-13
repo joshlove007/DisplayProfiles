@@ -5,6 +5,7 @@ using Microsoft.Windows.AppLifecycle;
 using MonitorToggle.App.Interop;
 using MonitorToggle.App.Tray;
 using MonitorToggle.Core.Services;
+using MonitorToggle.Core.XboxMode;
 
 namespace MonitorToggle.App;
 
@@ -16,6 +17,7 @@ public partial class App : Application
     private readonly DispatcherQueue ui = DispatcherQueue.GetForCurrentThread();
     private ProfileService? profiles;
     private TrayHost? tray;
+    private FullScreenExperienceMonitor? xboxMonitor;
     private MainWindow? window;
     private bool exiting;
 
@@ -33,11 +35,32 @@ public partial class App : Application
         profiles = AppServices.CreateProfiles();
         tray = new TrayHost(profiles, ui, ShowWindow, ExitApp);
         mainInstance.Activated += (_, _) => ui.TryEnqueue(ShowWindow);
+        StartXboxModeWatcher();
 
         if (!startHidden)
         {
             ShowWindow();
         }
+    }
+
+    private void StartXboxModeWatcher()
+    {
+        xboxMonitor = FullScreenExperienceMonitor.TryCreate();
+        if (xboxMonitor is null || !xboxMonitor.Start())
+        {
+            return;
+        }
+
+        // Its own service instance: it applies profiles from a background thread.
+        var controller = new XboxModeController(xboxMonitor, AppServices.CreateProfiles());
+        controller.Applied += (name, result) => ui.TryEnqueue(() =>
+        {
+            if (!result.Success)
+            {
+                tray?.Notify("Couldn't switch to " + name, result.Error ?? "Windows did not apply the display settings.");
+            }
+        });
+        controller.Start();
     }
 
     internal void ShowWindow()
@@ -63,6 +86,7 @@ public partial class App : Application
     private void ExitApp()
     {
         exiting = true;
+        xboxMonitor?.Dispose();
         tray?.Dispose();
         window?.Close();
         Exit();
