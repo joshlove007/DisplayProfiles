@@ -52,7 +52,7 @@
                 <ActivateAfterInstall>false</ActivateAfterInstall>
                 <FavoriteAfterInstall>true</FavoriteAfterInstall>
                 <ActivationUri>ms-gamebarwidget://DisplayProfiles</ActivationUri>
-                <Icon>Assets\Square44x44Logo.png</Icon>
+                <Icon>Assets\WidgetIcon.png</Icon>
                 <Logo>Assets\Square150x150Logo.png</Logo>
                 <Window>
                   <Size>

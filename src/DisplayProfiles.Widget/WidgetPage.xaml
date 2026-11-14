@@ -30,7 +30,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,0">
-            <FontIcon Glyph="&#xE7F4;" FontSize="20" VerticalAlignment="Center" />
+            <Image x:Name="HeaderIcon" Width="24" Height="24" VerticalAlignment="Center" />
             <TextBlock Text="Display profiles" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
 

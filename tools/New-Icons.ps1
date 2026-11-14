@@ -133,6 +133,13 @@ foreach ($t in @(@('Square44x44Logo.png', 44), @('Square150x150Logo.png', 150), 
 $splash = New-IconBitmap 300 'tile' ([System.Drawing.Color]::White) 620 300 0.7
 [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets 'SplashScreen.png'), (Get-Png $splash)); $splash.Dispose()
 
+# Game Bar draws widget icons as plain glyphs on its dark toolbar, so the toolbar icon is white on transparent.
+# The header inside the widget picks the glyph that matches the widget theme.
+foreach ($t in @(@('WidgetIcon.png', 88, [System.Drawing.Color]::White), @('HeaderIcon-dark.png', 64, [System.Drawing.Color]::White), @('HeaderIcon-light.png', 64, $light))) {
+    $b = New-IconBitmap $t[1] 'mono' $t[2] $t[1] $t[1] 0.92
+    [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets $t[0]), (Get-Png $b)); $b.Dispose()
+}
+
 if ($PreviewDir) {
     New-Item -ItemType Directory -Force $PreviewDir | Out-Null
     foreach ($style in 'color', 'tile') { $b = New-IconBitmap 256 $style; $b.Save((Join-Path $PreviewDir "preview-$style.png")); $b.Dispose() }
