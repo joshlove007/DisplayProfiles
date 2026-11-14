@@ -54,7 +54,7 @@ Download the latest build from the [Releases](https://github.com/joshlove007/Dis
 |---|---|
 | `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed. |
 | `DisplayProfiles-Setup-<version>-arm64.exe` | Installer for Windows on ARM. |
-| `DisplayProfiles-<version>-<arch>-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
+| `DisplayProfiles-<version>-win-x64-portable.zip` and `...-win-arm64-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
 | `DisplayProfiles-GameBarWidget-<version>.zip` | The optional Xbox Game Bar widget (see below). |
 
 > [!NOTE]
