@@ -11,6 +11,8 @@ internal static class AppServices
     {
         var profiles = new ProfileService(new Win32DisplayManager(), new ProfileStore(ProfileStore.DefaultPath));
         profiles.SeedIfFirstRun(LegacyImporter.DefaultFolder);
+        WidgetBridge.EnsureProtocolRegistered(Environment.ProcessPath!);
+        profiles.Changed += () => WidgetBridge.Publish(profiles);
         return profiles;
     }
 

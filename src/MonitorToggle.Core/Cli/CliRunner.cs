@@ -1,3 +1,4 @@
+using MonitorToggle.Core.Integration;
 using MonitorToggle.Core.Model;
 using MonitorToggle.Core.Services;
 
@@ -21,13 +22,26 @@ public static class CliRunner
           list               List profiles; the active one is marked with *
           current            Show the active profile
           capture <name>     Save the current display layout as a new profile
+          refresh            Update the profile list shown by the Game Bar widget
           help               Show this help
+        Links such as monitortoggle:apply/TV or monitortoggle:next work in place of a command.
         Start without a command to open the app. Use --background to start only the tray icon.
         """;
 
     /// <summary>Runs a command; returns <see cref="NotHandled"/> when the arguments are not a CLI command (start the GUI).</summary>
     public static int Run(string[] args, ProfileService service, TextWriter output, TextWriter error)
     {
+        if (args.Length > 0 && WidgetBridge.TranslateUri(args[0]) is { } translated)
+        {
+            return Run(translated, service, output, error);
+        }
+
+        if (args.Length > 0 && args[0].StartsWith(WidgetBridge.UriScheme + ":", StringComparison.OrdinalIgnoreCase))
+        {
+            error.WriteLine($"Unrecognized link '{args[0]}'.");
+            return Usage;
+        }
+
         if (args.Length == 0 || (args[0].StartsWith("--", StringComparison.Ordinal) && args[0] != "--help"))
         {
             return NotHandled;
@@ -49,6 +63,9 @@ public static class CliRunner
                 return Current(service, output);
             case "capture":
                 return Capture(rest, service, output, error);
+            case "refresh":
+                WidgetBridge.Publish(service);
+                return Success;
             case "help":
             case "--help":
             case "-h":

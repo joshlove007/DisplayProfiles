@@ -16,6 +16,9 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
 
     public ProfileData Data { get; private set; } = store.Load();
 
+    /// <summary>Raised after profiles or settings were saved. Used to keep the Game Bar widget's snapshot current.</summary>
+    public event Action? Changed;
+
     public void Reload() => Data = store.Load();
 
     /// <summary>
@@ -41,6 +44,7 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
         // Re-read first so a CLI invocation never overwrites edits made by the GUI process.
         Data = change(store.Load());
         store.Save(Data);
+        Changed?.Invoke();
     }
 
     /// <summary>Current desktop as a layout, including connected monitors that are switched off.</summary>
