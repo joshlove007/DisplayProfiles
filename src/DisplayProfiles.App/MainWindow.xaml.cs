@@ -3,6 +3,8 @@ using DisplayProfiles.App.Input;
 using DisplayProfiles.App.Interop;
 using DisplayProfiles.App.Pages;
 using DisplayProfiles.Core.Input;
+using DisplayProfiles.Core.Model;
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -40,6 +42,8 @@ public sealed partial class MainWindow : Window
         }
         else
         {
+            ApplyDesktopTheme();
+            WindowRoot.ActualThemeChanged += (_, _) => UpdateCaptionButtons();
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
             SystemBackdrop = new MicaBackdrop();
@@ -77,10 +81,38 @@ public sealed partial class MainWindow : Window
 
     internal IControllerPage? CurrentPage => ContentFrame.Content as IControllerPage;
 
+    /// <summary>Applies the desktop theme setting: light, dark, or the Windows app mode.</summary>
+    internal void ApplyDesktopTheme()
+    {
+        WindowRoot.RequestedTheme = App.Instance.Profiles.Data.Settings.DesktopTheme switch
+        {
+            DesktopThemePreference.Dark => ElementTheme.Dark,
+            DesktopThemePreference.Light => ElementTheme.Light,
+            _ => ElementTheme.Default,
+        };
+
+        UpdateCaptionButtons();
+    }
+
+    // The caption buttons are drawn by the system, so they have to be told which theme the content uses.
+    private void UpdateCaptionButtons()
+    {
+        bool dark = WindowRoot.ActualTheme == ElementTheme.Dark;
+        var titleBar = AppWindow.TitleBar;
+        titleBar.ButtonForegroundColor = dark ? Colors.White : Colors.Black;
+        titleBar.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
+        titleBar.ButtonHoverBackgroundColor = dark ? Windows.UI.Color.FromArgb(25, 255, 255, 255) : Windows.UI.Color.FromArgb(25, 0, 0, 0);
+        titleBar.ButtonPressedBackgroundColor = dark ? Windows.UI.Color.FromArgb(15, 255, 255, 255) : Windows.UI.Color.FromArgb(15, 0, 0, 0);
+        titleBar.ButtonInactiveForegroundColor = Windows.UI.Color.FromArgb(255, 143, 143, 143);
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+    }
+
     private void SetUpControllerLook()
     {
-        // Xbox mode: dark, green, no title bar or caption buttons, and (unless --windowed) the whole screen.
-        WindowRoot.RequestedTheme = ElementTheme.Dark;
+        // Xbox mode: themed, no title bar or caption buttons, and (unless --windowed) the whole screen.
+        var theme = App.Instance.Profiles.Data.Settings.ControllerTheme;
+        WindowRoot.RequestedTheme = XboxTheme.ElementThemeFor(theme);
         WindowRoot.Background = XboxTheme.CreateBackground();
         AppTitleBar.Visibility = Visibility.Collapsed;
         Hints.Visibility = Visibility.Visible;

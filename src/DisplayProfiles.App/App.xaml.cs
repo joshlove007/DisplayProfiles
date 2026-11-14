@@ -104,6 +104,17 @@ public partial class App : Application
             return;
         }
 
+        RebuildWindow();
+    }
+
+    /// <summary>Recreates the window, keeping the page and visibility, so a changed look is applied from scratch.</summary>
+    internal void RebuildWindow()
+    {
+        if (window is null)
+        {
+            return;
+        }
+
         bool visible = window.AppWindow.IsVisible;
         string page = window.CurrentTag;
         CloseWindow();
@@ -136,7 +147,8 @@ public partial class App : Application
             ControllerUi.SetActive(controller);
             if (controller)
             {
-                XboxTheme.Apply();
+                profiles!.Reload();
+                XboxTheme.Apply(profiles.Data.Settings.ControllerTheme);
             }
             else
             {

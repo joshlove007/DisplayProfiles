@@ -47,9 +47,16 @@
                 <controls:OptionPicker x:Name="TimeoutBox" Title="Keep-changes timeout" MinWidth="200" SelectionChanged="OnTimeoutChanged" />
             </tk:SettingsCard>
 
+            <tk:SettingsCard x:Name="ThemeCard" Header="Theme">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE790;" />
+                </tk:SettingsCard.HeaderIcon>
+                <controls:OptionPicker x:Name="ThemeBox" Title="Theme" MinWidth="200" SelectionChanged="OnThemeChanged" />
+            </tk:SettingsCard>
+
             <tk:SettingsCard
                 Header="Controller layout"
-                Description="Large, dark, controller-friendly layout. Automatic uses it while the PC is in Xbox mode.">
+                Description="Large, controller-friendly layout. Automatic uses it while the PC is in Xbox mode.">
                 <tk:SettingsCard.HeaderIcon>
                     <FontIcon Glyph="&#xE7FC;" />
                 </tk:SettingsCard.HeaderIcon>

@@ -164,13 +164,15 @@ public class ProfileServiceTests : IDisposable
     {
         var service = Create(new FakeDisplayManager(Desk()));
         var profile = Profile.Create("Desk", service.CaptureLayout());
-        service.Update(d => d with { Profiles = [profile], Settings = d.Settings with { XboxEnterProfileId = profile.Id, RevertTimeoutSeconds = 30, ControllerMode = ControllerModePreference.Always } });
+        service.Update(d => d with { Profiles = [profile], Settings = d.Settings with { XboxEnterProfileId = profile.Id, RevertTimeoutSeconds = 30, ControllerMode = ControllerModePreference.Always, DesktopTheme = DesktopThemePreference.Light, ControllerTheme = ControllerThemePreference.Classic } });
 
         var reloaded = new ProfileStore(Path.Combine(dir, "profiles.json")).Load();
 
         Assert.Equal(profile.Id, reloaded.Settings.XboxEnterProfileId);
         Assert.Equal(30, reloaded.Settings.RevertTimeoutSeconds);
         Assert.Equal(ControllerModePreference.Always, reloaded.Settings.ControllerMode);
+        Assert.Equal(DesktopThemePreference.Light, reloaded.Settings.DesktopTheme);
+        Assert.Equal(ControllerThemePreference.Classic, reloaded.Settings.ControllerTheme);
         Assert.Equal(profile.Monitors.Count, reloaded.Profiles.Single().Monitors.Count);
         Assert.Equal("Desk", reloaded.Profiles.Single().Name);
     }

@@ -14,6 +14,13 @@ public sealed partial class SettingsPage : Page, IControllerPage
 
     private static readonly string[] ControllerChoices = ["Automatic (in Xbox mode)", "Always on", "Always off"];
 
+    // The order shown in the drop-down, mapped to the stored values.
+    private static readonly (string Name, DesktopThemePreference Value)[] DesktopThemes =
+        [("Dark", DesktopThemePreference.Dark), ("Light", DesktopThemePreference.Light), ("Automatic (System)", DesktopThemePreference.System)];
+
+    private static readonly (string Name, ControllerThemePreference Value)[] ControllerThemes =
+        [("Light", ControllerThemePreference.Light), ("Dark", ControllerThemePreference.Dark), ("Classic", ControllerThemePreference.Classic)];
+
     private bool loading;
     private List<int> timeouts = [.. TimeoutChoices];
 
@@ -47,7 +54,45 @@ public sealed partial class SettingsPage : Page, IControllerPage
         TimeoutBox.SelectedIndex = timeouts.IndexOf(saved);
         ControllerBox.ItemsSource = ControllerChoices;
         ControllerBox.SelectedIndex = (int)service.Data.Settings.ControllerMode;
+
+        // The theme choices depend on which layout is showing.
+        if (ControllerUi.IsActive)
+        {
+            ThemeCard.Description = "Colour scheme of the Xbox mode layout. Classic is the original green look.";
+            ThemeBox.ItemsSource = ControllerThemes.Select(t => t.Name).ToList();
+            ThemeBox.SelectedIndex = Array.FindIndex(ControllerThemes, t => t.Value == service.Data.Settings.ControllerTheme);
+        }
+        else
+        {
+            ThemeCard.Description = "Colour scheme of the app window.";
+            ThemeBox.ItemsSource = DesktopThemes.Select(t => t.Name).ToList();
+            ThemeBox.SelectedIndex = Array.FindIndex(DesktopThemes, t => t.Value == service.Data.Settings.DesktopTheme);
+        }
+
         loading = false;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        if (loading || ThemeBox.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        if (ControllerUi.IsActive)
+        {
+            var theme = ControllerThemes[ThemeBox.SelectedIndex].Value;
+            App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { ControllerTheme = theme } });
+
+            // The look is applied when the window is created, and rebuilding destroys this page, so let the event finish first.
+            DispatcherQueue.TryEnqueue(App.Instance.RebuildWindow);
+        }
+        else
+        {
+            var theme = DesktopThemes[ThemeBox.SelectedIndex].Value;
+            App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { DesktopTheme = theme } });
+            App.Instance.MainWindow?.ApplyDesktopTheme();
+        }
     }
 
     private void OnStartupToggled(object sender, RoutedEventArgs e)
