@@ -5,6 +5,7 @@
 param(
     [string]$AppAssets = (Join-Path $PSScriptRoot '..\src\DisplayProfiles.App\Assets'),
     [string]$WidgetAssets = (Join-Path $PSScriptRoot '..\src\DisplayProfiles.Widget\Assets'),
+    [string]$GameBarIcons = (Join-Path $PSScriptRoot '..\src\DisplayProfiles.Widget\GameBar\Icons'),
     [string]$PreviewDir
 )
 
@@ -126,27 +127,29 @@ Save-Ico (Join-Path $AppAssets 'tray-dark.ico') @(16, 20, 24, 32, 48) 'mono' ([S
 $titleBar = New-IconBitmap 32 'color'
 [System.IO.File]::WriteAllBytes((Join-Path $AppAssets 'titlebar.png'), (Get-Png $titleBar)); $titleBar.Dispose()
 
-foreach ($t in @(@('Square150x150Logo.png', 150), @('StoreLogo.png', 50))) {
-    $b = New-IconBitmap $t[1] 'tile' ([System.Drawing.Color]::White) $t[1] $t[1] 0.86
+foreach ($t in @(@('Square44x44Logo.png', 44), @('Square150x150Logo.png', 150), @('StoreLogo.png', 50))) {
+    $b = New-IconBitmap $t[1] 'color' ([System.Drawing.Color]::Black) $t[1] $t[1] 0.86
     [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets $t[0]), (Get-Png $b)); $b.Dispose()
 }
-
-# Square44x44Logo.png itself is what Game Bar draws on its toolbar, so it is the white glyph on transparent.
-# Start, the taskbar and app lists use the target-size files, which keep the accent tile.
-$b = New-IconBitmap 44 'mono' ([System.Drawing.Color]::White) 44 44 0.92
-[System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets 'Square44x44Logo.png'), (Get-Png $b)); $b.Dispose()
 foreach ($size in 16, 24, 32, 48, 256) {
-    $b = New-IconBitmap $size 'tile' ([System.Drawing.Color]::White) $size $size 0.86
-    [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets "Square44x44Logo.targetsize-$size.png"), (Get-Png $b)); $b.Dispose()
     $b = New-IconBitmap $size 'color'
     [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets "Square44x44Logo.targetsize-${size}_altform-unplated.png"), (Get-Png $b)); $b.Dispose()
 }
-$splash = New-IconBitmap 300 'tile' ([System.Drawing.Color]::White) 620 300 0.7
+$splash = New-IconBitmap 300 'color' ([System.Drawing.Color]::Black) 620 300 0.7
 [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets 'SplashScreen.png'), (Get-Png $splash)); $splash.Dispose()
 
-# Game Bar draws widget icons as plain glyphs on its dark toolbar, so the toolbar icon is white on transparent.
+# Game Bar's toolbar and menu read icon.targetsize-N.png (dark theme) and icon.light.targetsize-N.png (light theme)
+# from the widget's PublicFolder\Icons; without them it falls back to the package logo. They are plain glyphs.
+$null = New-Item -ItemType Directory -Force $GameBarIcons
+foreach ($size in 16, 20, 24, 32, 44, 256) {
+    $b = New-IconBitmap $size 'mono' ([System.Drawing.Color]::White) $size $size 0.94
+    [System.IO.File]::WriteAllBytes((Join-Path $GameBarIcons "icon.targetsize-$size.png"), (Get-Png $b)); $b.Dispose()
+    $b = New-IconBitmap $size 'mono' $light $size $size 0.94
+    [System.IO.File]::WriteAllBytes((Join-Path $GameBarIcons "icon.light.targetsize-$size.png"), (Get-Png $b)); $b.Dispose()
+}
+
 # The header inside the widget picks the glyph that matches the widget theme.
-foreach ($t in @(@('WidgetIcon.png', 88, [System.Drawing.Color]::White), @('HeaderIcon-dark.png', 64, [System.Drawing.Color]::White), @('HeaderIcon-light.png', 64, $light))) {
+foreach ($t in @(@('HeaderIcon-dark.png', 64, [System.Drawing.Color]::White), @('HeaderIcon-light.png', 64, $light))) {
     $b = New-IconBitmap $t[1] 'mono' $t[2] $t[1] $t[1] 0.92
     [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets $t[0]), (Get-Png $b)); $b.Dispose()
 }
