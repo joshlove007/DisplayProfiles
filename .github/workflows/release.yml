@@ -1,0 +1,97 @@
+name: Release
+
+# Push a tag such as v0.1.0-beta.1 (or run the workflow by hand) to build the app and the Game Bar widget and publish a
+# GitHub release. Tags with a "-" suffix (beta, rc...) are marked as pre-releases.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release, for example v0.1.0-beta.1'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = $env:TAG
+          if ($tag -notmatch '^v(\d+\.\d+\.\d+)(-[0-9A-Za-z.-]+)?$') { throw "Tag '$tag' is not like v1.2.3 or v1.2.3-beta.1" }
+          "number=$($Matches[1])" >> $env:GITHUB_OUTPUT
+          "full=$($Matches[1])$($Matches[2])" >> $env:GITHUB_OUTPUT
+          "prerelease=$([bool]$Matches[2])".ToLower() >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test --solution DisplayProfiles.slnx --nologo
+
+      - name: Publish app and build installers
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress | Out-Null
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid `
+              -p:Version=${{ steps.version.outputs.full }} --nologo -v:minimal -o "publish/$rid"
+            if ($LASTEXITCODE -ne 0) { throw "publish failed for $rid" }
+            if (-not (Test-Path "publish/$rid/DisplayProfiles.pri")) { throw "DisplayProfiles.pri missing for $rid" }
+
+            # Portable zip
+            Compress-Archive "publish/$rid/*" "DisplayProfiles-${{ steps.version.outputs.full }}-$rid-portable.zip" -CompressionLevel Optimal
+
+            # Installer
+            $arch = $rid.Replace('win-', '')
+            & $iscc /Q "/DAppVersion=${{ steps.version.outputs.full }}" "/DNumericVersion=${{ steps.version.outputs.number }}.0" `
+              "/DArch=$arch" "/DSourceDir=..\publish\$rid" installer/DisplayProfiles.iss
+            if ($LASTEXITCODE -ne 0) { throw "installer build failed for $arch" }
+          }
+          Copy-Item artifacts/installer/*.exe .
+
+      - name: Build the Game Bar widget
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.WIDGET_SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.WIDGET_SIGNING_PFX_PASSWORD }}
+        run: |
+          # The same self-signed certificate signs every release, so users only have to trust it once.
+          $bytes = [Convert]::FromBase64String($env:PFX_BASE64)
+          $pfx = Join-Path $env:RUNNER_TEMP 'widget.pfx'
+          [IO.File]::WriteAllBytes($pfx, $bytes)
+          Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My `
+            -Password (ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force) | Out-Null
+          Remove-Item $pfx
+
+          ./tools/Build-Widget.ps1
+
+          $package = Get-ChildItem artifacts/widget -Filter '*.msix' -Recurse | Select-Object -First 1
+          $cer = Get-ChildItem $package.Directory.FullName -Filter '*.cer' | Select-Object -First 1
+          $stage = 'widget-stage'
+          New-Item -ItemType Directory $stage | Out-Null
+          Copy-Item $package.FullName, $cer.FullName, tools/Install-Widget.ps1 $stage
+          Compress-Archive "$stage/*" "DisplayProfiles-GameBarWidget-${{ steps.version.outputs.full }}.zip" -CompressionLevel Optimal
+
+      - name: Create the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $args = @('release', 'create', $env:TAG, '--title', "Display Profiles ${{ steps.version.outputs.full }}", '--generate-notes', '--verify-tag')
+          if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
+          $args += (Get-ChildItem *.zip, DisplayProfiles-Setup-*.exe | ForEach-Object Name)
+          gh @args

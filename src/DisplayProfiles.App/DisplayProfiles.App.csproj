@@ -34,4 +34,13 @@
     <Content Include="Assets\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- dotnet publish leaves out the compiled XAML (the app's .pri and the .xbf files) for unpackaged WinUI apps, so the
+       published app would crash on start. Add them to the publish list. -->
+  <Target Name="IncludeCompiledXamlInPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_CompiledXaml Include="$(OutDir)$(AssemblyName).pri;$(OutDir)**\*.xbf" />
+      <ResolvedFileToPublish Include="@(_CompiledXaml)" RelativePath="$([MSBuild]::MakeRelative('$(OutDir)', '%(FullPath)'))" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
 </Project>
