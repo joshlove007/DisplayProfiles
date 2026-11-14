@@ -59,7 +59,6 @@ public sealed partial class ControllerHints : UserControl
             Text = text,
             FontSize = 18,
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 235, 235, 235)),
         };
 
         return new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { badge, label } };
