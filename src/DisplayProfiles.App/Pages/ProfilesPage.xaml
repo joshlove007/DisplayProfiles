@@ -8,12 +8,55 @@
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
 
     <Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="ListPane.(Grid.Row)" Value="0" />
+                        <Setter Target="ListPane.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="ListPane.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="ListPane.Margin" Value="16,12,16,0" />
+                        <Setter Target="ProfileListView.MaxHeight" Value="150" />
+                        <Setter Target="EditorScroll.(Grid.Row)" Value="1" />
+                        <Setter Target="EditorScroll.(Grid.RowSpan)" Value="1" />
+                        <Setter Target="EditorScroll.(Grid.Column)" Value="0" />
+                        <Setter Target="EditorScroll.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="EditorScroll.Padding" Value="16,12,16,16" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="900" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="ListPane.(Grid.Row)" Value="0" />
+                        <Setter Target="ListPane.(Grid.RowSpan)" Value="2" />
+                        <Setter Target="ListPane.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="ListPane.Margin" Value="36,16,0,24" />
+                        <Setter Target="ProfileListView.MaxHeight" Value="Infinity" />
+                        <Setter Target="EditorScroll.(Grid.Row)" Value="0" />
+                        <Setter Target="EditorScroll.(Grid.RowSpan)" Value="2" />
+                        <Setter Target="EditorScroll.(Grid.Column)" Value="1" />
+                        <Setter Target="EditorScroll.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="EditorScroll.Padding" Value="24,16,36,24" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="280" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <Grid Margin="36,16,0,24">
+        <Grid x:Name="ListPane" Grid.RowSpan="2" Margin="36,16,0,24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -23,6 +66,7 @@
             <TextBlock Text="Display profiles" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,16" />
 
             <ListView
+                x:Name="ProfileListView"
                 Grid.Row="1"
                 ItemsSource="{x:Bind ViewModel.Profiles}"
                 SelectedItem="{x:Bind ViewModel.SelectedProfile, Mode=TwoWay}"
@@ -57,7 +101,7 @@
             </Button>
         </Grid>
 
-        <ScrollViewer Grid.Column="1" Padding="24,16,36,24">
+        <ScrollViewer x:Name="EditorScroll" Grid.Column="1" Grid.RowSpan="2" Padding="24,16,36,24">
             <StackPanel Spacing="16" MaxWidth="920" HorizontalAlignment="Stretch">
 
                 <StackPanel Spacing="8" Visibility="{x:Bind app:Ui.Hidden(ViewModel.HasProfile), Mode=OneWay}" Margin="0,48,0,0">

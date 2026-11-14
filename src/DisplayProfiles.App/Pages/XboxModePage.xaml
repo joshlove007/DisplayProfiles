@@ -4,7 +4,27 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
 
-    <ScrollViewer Padding="36,0,36,24">
+    <ScrollViewer x:Name="PageScroll" Padding="36,0,36,24">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageScroll.Padding" Value="16,0,16,16" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="900" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageScroll.Padding" Value="36,0,36,24" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <StackPanel Spacing="4" MaxWidth="920">
             <TextBlock Text="Xbox mode" Style="{StaticResource TitleTextBlockStyle}" Margin="0,16,0,16" />
 

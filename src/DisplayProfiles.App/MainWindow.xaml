@@ -22,8 +22,11 @@
         <NavigationView
             x:Name="Navigation"
             Grid.Row="1"
-            PaneDisplayMode="Left"
+            PaneDisplayMode="Auto"
+            CompactModeThresholdWidth="700"
+            ExpandedModeThresholdWidth="1000"
             IsBackButtonVisible="Collapsed"
+            DisplayModeChanged="OnDisplayModeChanged"
             IsSettingsVisible="True"
             OpenPaneLength="260"
             SelectionChanged="OnSelectionChanged">
