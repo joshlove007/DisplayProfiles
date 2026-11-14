@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         SystemBackdrop = new MicaBackdrop();
         AppWindow.SetIcon(AppServices.AssetPath("DisplayProfiles.ico"));
+        TitleBarIcon.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(AppServices.AssetPath("titlebar.png")));
 
         double scale = PInvoke.GetDpiForSystem() / 96.0;
         AppWindow.Resize(new SizeInt32((int)(1180 * scale), (int)(800 * scale)));

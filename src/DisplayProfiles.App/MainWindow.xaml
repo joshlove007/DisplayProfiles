@@ -15,7 +15,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <FontIcon Glyph="&#xE7F4;" FontSize="14" VerticalAlignment="Center" />
+            <Image x:Name="TitleBarIcon" Width="16" Height="16" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Text="Display Profiles" Style="{StaticResource CaptionTextBlockStyle}" VerticalAlignment="Center" />
         </Grid>
 
