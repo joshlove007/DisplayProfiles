@@ -8,20 +8,65 @@ using CommunityToolkit.WinUI.Controls;
 
 namespace DisplayProfiles.App.Pages;
 
-public sealed partial class ProfilesPage : Page
+public sealed partial class ProfilesPage : Page, IControllerPage
 {
     public ProfilesPage()
     {
         ViewModel = new ProfileEditorViewModel(App.Instance.Profiles);
         InitializeComponent();
         LayoutView.Attach(ViewModel);
+        LayoutView.GrabChanged += OnGrabChanged;
+
+        if (ControllerUi.IsActive)
+        {
+            // The pop-up menu can't be scaled or reached with a controller; the overlay list replaces it.
+            MoreButton.Flyout = null;
+        }
     }
 
     public ProfileEditorViewModel ViewModel { get; }
 
+    public IReadOnlyList<(string Button, string Text)> Hints { get; } = [("A", "Select"), ("B", "Back"), ("Y", "Apply"), ("LB RB", "Sections")];
+
+    public bool OnPrimaryAction()
+    {
+        if (!ViewModel.HasProfile || !ViewModel.IsNotBusy)
+        {
+            return false;
+        }
+
+        OnApplyClick(this, new RoutedEventArgs());
+        return true;
+    }
+
+    private void OnGrabChanged(bool grabbing) =>
+        App.Instance.MainWindow?.ShowHints(grabbing
+            ? [("◄▲▼►", "Move display"), ("A", "Drop here"), ("B", "Cancel")]
+            : Hints);
+
     protected override void OnNavigatedTo(NavigationEventArgs e) => ViewModel.Load();
 
     protected override void OnNavigatedFrom(NavigationEventArgs e) => ViewModel.Persist();
+
+    private async void OnMoreClick(object sender, RoutedEventArgs e)
+    {
+        var overlay = OverlayHost.Current;
+        if (!ControllerUi.IsActive || overlay is null)
+        {
+            return;
+        }
+
+        string[] actions = ["Create desktop shortcut", "Create Start menu shortcut", "Duplicate profile", "Move up in list", "Move down in list", "Delete profile"];
+        switch (await overlay.ShowChoiceAsync("Profile options", actions, -1))
+        {
+            case 0: OnDesktopShortcutClick(this, e); break;
+            case 1: OnStartMenuShortcutClick(this, e); break;
+            case 2: OnDuplicateClick(this, e); break;
+            case 3: OnMoveUpClick(this, e); break;
+            case 4: OnMoveDownClick(this, e); break;
+            case 5: OnDeleteClick(this, e); break;
+        }
+    }
 
     private void OnNewProfileClick(object sender, RoutedEventArgs e) => ViewModel.AddFromCurrent();
 
@@ -66,16 +111,29 @@ public sealed partial class ProfilesPage : Page
             return;
         }
 
-        var dialog = new ContentDialog
+        bool confirmed;
+        if (ControllerUi.IsActive && OverlayHost.Current is { } overlay)
         {
-            XamlRoot = XamlRoot,
-            Title = $"Delete \"{profile.Name}\"?",
-            Content = "This removes the profile from Display Profiles. Your displays aren't changed.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
-        };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            confirmed = await overlay.ShowConfirmAsync(
+                $"Delete \"{profile.Name}\"?",
+                "This removes the profile from Display Profiles. Your displays aren't changed.",
+                "Delete", "Cancel", defaultToSecondary: true);
+        }
+        else
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = $"Delete \"{profile.Name}\"?",
+                Content = "This removes the profile from Display Profiles. Your displays aren't changed.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+            };
+            confirmed = await dialog.ShowAsync() == ContentDialogResult.Primary;
+        }
+
+        if (confirmed)
         {
             ViewModel.DeleteSelected();
         }

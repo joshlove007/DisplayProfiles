@@ -1,4 +1,4 @@
-# DisplayProfiles
+# Display Profiles
 
 Profile-based display switcher for Windows 11, written in C# on .NET 11.
 
@@ -19,6 +19,8 @@ Windows.
 - **Xbox mode**: pick a profile to apply when Xbox mode starts (and optionally when it ends). Detection uses Windows'
   gaming-experience API.
 - **Game Bar widget**: pick a profile with a controller from Xbox Game Bar.
+- **Controller mode**: in Xbox mode the app switches to a dark, Xbox-green, full-screen layout with large controls and no
+  window buttons, and everything can be done with a gamepad (see below).
 - Imports the profiles of the original `toggle-monitor.ps1` script on first run.
 
 ## Build and run
@@ -42,6 +44,8 @@ DisplayProfiles.exe list | current    show profiles / the active one
 DisplayProfiles.exe capture <name>    save the current layout as a profile
 DisplayProfiles.exe --background      start only the tray icon
 DisplayProfiles.exe --page xbox       open the app on a page (profiles, xbox, settings)
+DisplayProfiles.exe --xbox            force the controller layout (--desktop forces the normal one)
+DisplayProfiles.exe --xbox --windowed controller layout in a normal window, handy for testing
 ```
 
 Settings > Shortcuts creates a shortcut per profile on the desktop or in the Start menu. Pin one in the Game Bar
@@ -66,6 +70,26 @@ displays itself: the app publishes the profile list into the widget's data folde
 
 Enable **Start with Windows** in Settings so the tray app is running when Xbox mode starts, then choose profiles on the
 Xbox mode page.
+
+### Controller mode
+
+While the PC is in Xbox mode (or when Settings > Controller layout is set to *Always on*) the app uses a controller layout.
+Any XInput gamepad works; the on-screen prompts at the bottom show what each button does.
+
+| Button | Action |
+|---|---|
+| D-pad / left stick | Move focus |
+| A | Select, toggle, expand, open a list |
+| B | Back (closes a list, leaves the page, then hides the app) |
+| Y | Apply the selected profile |
+| LB / RB | Previous / next section |
+| Right stick | Scroll |
+
+To arrange displays, focus a monitor in the map and press **A** to pick it up, move it with the D-pad (it jumps between
+positions that touch another display) and press **A** to drop it or **B** to cancel. Lists open as large pick-lists and the
+"Keep these display settings?" prompt becomes a full-width overlay with a countdown.
+
+The same actions work from a keyboard: arrows, Enter/Space, Esc, PageUp/PageDown and Y.
 
 ## Repository layout
 

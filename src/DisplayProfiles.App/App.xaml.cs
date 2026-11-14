@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using DisplayProfiles.App.Interop;
 using DisplayProfiles.App.Tray;
+using DisplayProfiles.Core.Model;
 using DisplayProfiles.Core.Services;
 using DisplayProfiles.Core.XboxMode;
 
@@ -13,7 +14,7 @@ namespace DisplayProfiles.App;
 public partial class App : Application
 {
     private readonly bool startHidden;
-    private readonly string? initialPage;
+    private string? initialPage;
     private readonly AppInstance mainInstance;
     private readonly DispatcherQueue ui = DispatcherQueue.GetForCurrentThread();
     private ProfileService? profiles;
@@ -21,6 +22,7 @@ public partial class App : Application
     private FullScreenExperienceMonitor? xboxMonitor;
     private MainWindow? window;
     private bool exiting;
+    private bool closingForReal;
 
     public App(bool startHidden, AppInstance mainInstance, string? initialPage = null)
     {
@@ -37,6 +39,8 @@ public partial class App : Application
     internal ProfileService Profiles => profiles!;
 
     internal FullScreenExperienceMonitor? XboxMonitor => xboxMonitor;
+
+    internal MainWindow? MainWindow => window;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -60,6 +64,9 @@ public partial class App : Application
             return;
         }
 
+        // Entering or leaving Xbox mode may switch the app between its desktop and controller looks.
+        xboxMonitor.StateChanged += _ => ui.TryEnqueue(RefreshUiMode);
+
         // Its own service instance: it applies profiles from a background thread.
         var controller = new XboxModeController(xboxMonitor, AppServices.CreateProfiles());
         controller.Applied += (name, result) => ui.TryEnqueue(() =>
@@ -72,14 +79,74 @@ public partial class App : Application
         controller.Start();
     }
 
+    /// <summary>Whether the large, controller-friendly look should be used right now.</summary>
+    private bool WantsController()
+    {
+        if (ControllerUi.Forced is { } forced)
+        {
+            return forced;
+        }
+
+        profiles!.Reload();
+        return profiles.Data.Settings.ControllerMode switch
+        {
+            ControllerModePreference.Always => true,
+            ControllerModePreference.Never => false,
+            _ => xboxMonitor?.IsActive == true,
+        };
+    }
+
+    /// <summary>Rebuilds the window if the desired look (desktop or controller) no longer matches the one on screen.</summary>
+    internal void RefreshUiMode()
+    {
+        if (window is null || window.IsController == WantsController())
+        {
+            return;
+        }
+
+        bool visible = window.AppWindow.IsVisible;
+        string page = window.CurrentTag;
+        CloseWindow();
+        if (visible)
+        {
+            initialPage = page;
+            ShowWindow();
+        }
+    }
+
+    private void CloseWindow()
+    {
+        closingForReal = true;
+        window?.Close();
+        window = null;
+        closingForReal = false;
+    }
+
     internal void ShowWindow()
     {
+        if (window is not null && window.IsController != WantsController())
+        {
+            initialPage = window.CurrentTag;
+            CloseWindow();
+        }
+
         if (window is null)
         {
+            bool controller = WantsController();
+            ControllerUi.SetActive(controller);
+            if (controller)
+            {
+                XboxTheme.Apply();
+            }
+            else
+            {
+                XboxTheme.Remove();
+            }
+
             window = new MainWindow(initialPage);
             window.AppWindow.Closing += (_, e) =>
             {
-                if (!exiting)
+                if (!exiting && !closingForReal)
                 {
                     // Closing the window keeps the tray icon running.
                     e.Cancel = true;

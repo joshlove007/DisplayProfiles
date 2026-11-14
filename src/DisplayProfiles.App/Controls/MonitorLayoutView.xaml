@@ -5,15 +5,47 @@
     SizeChanged="OnSizeChanged">
 
     <UserControl.Resources>
-        <Style x:Key="TileStyle" TargetType="Border">
+        <Style x:Key="TileStyle" TargetType="ContentControl">
+            <Setter Property="IsTabStop" Value="True" />
             <Setter Property="Background" Value="{ThemeResource ControlAltFillColorTertiaryBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContentControl">
+                        <Grid>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="FocusStates">
+                                    <VisualState x:Name="Focused">
+                                        <VisualState.Setters>
+                                            <Setter Target="FocusRing.Visibility" Value="Visible" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Unfocused" />
+                                    <VisualState x:Name="PointerFocused" />
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="FocusRing" Visibility="Collapsed" Margin="-3"
+                                    BorderBrush="{ThemeResource TextFillColorPrimaryBrush}"
+                                    BorderThickness="3" CornerRadius="7" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style x:Key="SelectedTileStyle" TargetType="Border" BasedOn="{StaticResource TileStyle}">
+        <Style x:Key="SelectedTileStyle" TargetType="ContentControl" BasedOn="{StaticResource TileStyle}">
             <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style x:Key="GrabbedTileStyle" TargetType="ContentControl" BasedOn="{StaticResource SelectedTileStyle}">
+            <Setter Property="BorderBrush" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="4" />
         </Style>
         <Style x:Key="TileNumberStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />

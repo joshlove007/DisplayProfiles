@@ -46,6 +46,10 @@ public static class Program
         {
             var queue = DispatcherQueue.GetForCurrentThread();
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(queue));
+            ControllerUi.Forced = args.Contains("--xbox", StringComparer.OrdinalIgnoreCase) ? true
+                : args.Contains("--desktop", StringComparer.OrdinalIgnoreCase) ? false
+                : null;
+            ControllerUi.Windowed = args.Contains("--windowed", StringComparer.OrdinalIgnoreCase);
             var app = new App(
                 startHidden: args.Contains("--background", StringComparer.OrdinalIgnoreCase),
                 mainInstance,

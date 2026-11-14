@@ -8,9 +8,14 @@ using DisplayProfiles.Core.Model;
 
 namespace DisplayProfiles.App.Pages;
 
-public sealed partial class SettingsPage : Page
+public sealed partial class SettingsPage : Page, IControllerPage
 {
+    private static readonly int[] TimeoutChoices = [5, 10, 15, 20, 30, 45, 60, 120];
+
+    private static readonly string[] ControllerChoices = ["Automatic (in Xbox mode)", "Always on", "Always off"];
+
     private bool loading;
+    private List<int> timeouts = [.. TimeoutChoices];
 
     public SettingsPage()
     {
@@ -19,13 +24,29 @@ public sealed partial class SettingsPage : Page
         AboutCard.Description = $"Version {version} · MIT license";
     }
 
+    public IReadOnlyList<(string Button, string Text)> Hints { get; } = [("A", "Select"), ("B", "Back"), ("LB RB", "Sections")];
+
+    public bool OnPrimaryAction() => false;
+
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         var service = App.Instance.Profiles;
         service.Reload();
         loading = true;
         StartupSwitch.IsOn = StartupRegistration.IsEnabled();
-        TimeoutBox.Value = service.Data.Settings.RevertTimeoutSeconds;
+
+        int saved = service.Data.Settings.RevertTimeoutSeconds;
+        timeouts = [.. TimeoutChoices];
+        if (!timeouts.Contains(saved))
+        {
+            timeouts.Add(saved);
+            timeouts.Sort();
+        }
+
+        TimeoutBox.ItemsSource = timeouts.Select(s => $"{s} seconds").ToList();
+        TimeoutBox.SelectedIndex = timeouts.IndexOf(saved);
+        ControllerBox.ItemsSource = ControllerChoices;
+        ControllerBox.SelectedIndex = (int)service.Data.Settings.ControllerMode;
         loading = false;
     }
 
@@ -40,15 +61,29 @@ public sealed partial class SettingsPage : Page
         App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { StartWithWindows = StartupSwitch.IsOn } });
     }
 
-    private void OnTimeoutChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void OnTimeoutChanged(object? sender, EventArgs e)
     {
-        if (loading || double.IsNaN(args.NewValue))
+        if (loading || TimeoutBox.SelectedIndex < 0)
         {
             return;
         }
 
-        int seconds = (int)args.NewValue;
+        int seconds = timeouts[TimeoutBox.SelectedIndex];
         App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { RevertTimeoutSeconds = seconds } });
+    }
+
+    private void OnControllerModeChanged(object? sender, EventArgs e)
+    {
+        if (loading || ControllerBox.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        var mode = (ControllerModePreference)ControllerBox.SelectedIndex;
+        App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { ControllerMode = mode } });
+
+        // Rebuilding the window destroys this page, so let the current event finish first.
+        DispatcherQueue.TryEnqueue(App.Instance.RefreshUiMode);
     }
 
     private void OnProfileShortcutsDesktop(object sender, RoutedEventArgs e) => CreateProfileShortcuts(ShortcutService.DesktopFolder, "the desktop");

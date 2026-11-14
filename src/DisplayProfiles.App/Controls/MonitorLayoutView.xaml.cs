@@ -1,16 +1,20 @@
+using DisplayProfiles.App.ViewModels;
+using DisplayProfiles.Core.Input;
+using DisplayProfiles.Core.Model;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using DisplayProfiles.App.ViewModels;
-using DisplayProfiles.Core.Model;
 using Windows.Foundation;
+using Windows.System;
 
 namespace DisplayProfiles.App.Controls;
 
-/// <summary>Draggable map of the monitors in a profile, in the style of Windows Settings > Display.</summary>
-public sealed partial class MonitorLayoutView : UserControl
+/// <summary>
+/// Map of the monitors in a profile, in the style of Windows Settings > Display. Tiles can be dragged with a mouse or touch,
+/// or picked up with the keyboard/controller (A), moved one valid position at a time with the arrows/D-pad, and dropped (A).
+/// </summary>
+public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
 {
     private const double EdgePadding = 16;
     private const double MaxScale = 0.12;
@@ -19,7 +23,7 @@ public sealed partial class MonitorLayoutView : UserControl
     // Tiles are drawn slightly smaller than their monitors so touching displays show a thin gap, as in Windows Settings.
     private const double TileGap = 3;
 
-    private readonly Dictionary<MonitorViewModel, (Border Tile, TextBlock Number)> tiles = [];
+    private readonly Dictionary<MonitorViewModel, (ContentControl Tile, TextBlock Number)> tiles = [];
     private ProfileEditorViewModel? editor;
     private double scale = MaxScale;
     private double originX;
@@ -30,10 +34,18 @@ public sealed partial class MonitorLayoutView : UserControl
     private (int X, int Y) dragStartPosition;
     private (int X, int Y) dragCurrent;
 
+    private MonitorViewModel? grabbed;
+    private (int X, int Y) grabStart;
+    private (int X, int Y) grabSlot;
+    private MonitorViewModel? focusAfterRender;
+
     public MonitorLayoutView()
     {
         InitializeComponent();
     }
+
+    /// <summary>Raised with true when a monitor is picked up with the keyboard/controller and false when it is put down.</summary>
+    public event Action<bool>? GrabChanged;
 
     public void Attach(ProfileEditorViewModel viewModel)
     {
@@ -53,8 +65,16 @@ public sealed partial class MonitorLayoutView : UserControl
 
     private void Render()
     {
+        // Rendering replaces the tiles, so keep focus on the same display if it was on one.
+        focusAfterRender ??= tiles.FirstOrDefault(t => t.Value.Tile.FocusState != FocusState.Unfocused).Key;
         Surface.Children.Clear();
         tiles.Clear();
+        if (grabbed is not null)
+        {
+            grabbed = null;
+            GrabChanged?.Invoke(false);
+        }
+
         if (editor is null || ActualWidth < 10 || ActualHeight < 10)
         {
             return;
@@ -68,8 +88,10 @@ public sealed partial class MonitorLayoutView : UserControl
         }
 
         // Leave room around the monitors so one can be dragged to any side of the others.
-        double marginX = enabled.Max(m => m.Width) * 0.5;
-        double marginY = enabled.Max(m => m.Height) * 0.5;
+        // A controller moves a display to slots touching its neighbours, which can be a whole display away.
+        double margin = ControllerUi.IsActive ? 1.0 : 0.5;
+        double marginX = enabled.Max(m => m.Width) * margin;
+        double marginY = enabled.Max(m => m.Height) * margin;
         double minX = enabled.Min(m => m.X) - marginX;
         double minY = enabled.Min(m => m.Y) - marginY;
         double width = enabled.Max(m => m.X + m.Width) + marginX - minX;
@@ -87,20 +109,26 @@ public sealed partial class MonitorLayoutView : UserControl
                 Style = (Style)Resources["TileNumberStyle"],
                 FontSize = Math.Clamp(monitor.Height * scale * 0.38, 14, 40),
             };
-            var tile = new Border
+            var tile = new ContentControl
             {
                 Width = Math.Max(1, (monitor.Width * scale) - TileGap),
                 Height = Math.Max(1, (monitor.Height * scale) - TileGap),
-                Child = new Grid { Children = { new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { number } } } },
+                Content = number,
                 Tag = monitor,
             };
-            ToolTipService.SetToolTip(tile, $"{monitor.Name}\n{monitor.Width} × {monitor.Height}");
+            AutomationHelper.SetName(tile, $"Display {monitor.Number}, {monitor.Name}");
+            if (!ControllerUi.IsActive)
+            {
+                ToolTipService.SetToolTip(tile, $"{monitor.Name}\n{monitor.Width} × {monitor.Height}");
+            }
             tile.PointerPressed += OnPointerPressed;
             tile.PointerMoved += OnPointerMoved;
             tile.PointerReleased += OnPointerReleased;
             tile.PointerCanceled += OnPointerReleased;
             tile.PointerEntered += (_, _) => ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
             tile.PointerExited += (_, _) => ProtectedCursor = null;
+            tile.GotFocus += (_, _) => editor.Select(monitor);
+            tile.KeyDown += OnTileKeyDown;
 
             Canvas.SetLeft(tile, (monitor.X * scale) + originX + (TileGap / 2));
             Canvas.SetTop(tile, (monitor.Y * scale) + originY + (TileGap / 2));
@@ -109,6 +137,20 @@ public sealed partial class MonitorLayoutView : UserControl
         }
 
         UpdateSelection();
+
+        if (focusAfterRender is { } target && tiles.TryGetValue(target, out var focusTile))
+        {
+            // Freshly added tiles can only take focus after layout, and a later render may replace them first.
+            var toFocus = focusTile.Tile;
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                bool ok = toFocus.Focus(FocusState.Keyboard);
+                if (ok && focusAfterRender == target)
+                {
+                    focusAfterRender = null;
+                }
+            });
+        }
     }
 
     private void UpdateSelection()
@@ -116,14 +158,15 @@ public sealed partial class MonitorLayoutView : UserControl
         foreach (var (monitor, (tile, number)) in tiles)
         {
             bool selected = monitor == editor?.SelectedMonitor;
-            tile.Style = (Style)Resources[selected ? "SelectedTileStyle" : "TileStyle"];
+            string tileStyle = monitor == grabbed ? "GrabbedTileStyle" : selected ? "SelectedTileStyle" : "TileStyle";
+            tile.Style = (Style)Resources[tileStyle];
             number.Style = (Style)Resources[selected ? "SelectedTileNumberStyle" : "TileNumberStyle"];
         }
     }
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (sender is not Border { Tag: MonitorViewModel monitor } tile || editor is null)
+        if (sender is not ContentControl { Tag: MonitorViewModel monitor } tile || editor is null)
         {
             return;
         }
@@ -139,7 +182,7 @@ public sealed partial class MonitorLayoutView : UserControl
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (dragging is null || editor is null || sender is not Border tile)
+        if (dragging is null || editor is null || sender is not ContentControl tile)
         {
             return;
         }
@@ -153,13 +196,12 @@ public sealed partial class MonitorLayoutView : UserControl
         dragCurrent = LayoutMath.Snap(moving, proposedX, proposedY, others, (int)(SnapDistance / scale));
 
         // Only the tile moves while dragging; the layout is committed on release.
-        Canvas.SetLeft(tile, (dragCurrent.X * scale) + originX + (TileGap / 2));
-        Canvas.SetTop(tile, (dragCurrent.Y * scale) + originY + (TileGap / 2));
+        Place(tile, dragCurrent);
     }
 
     private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (dragging is null || editor is null || sender is not Border tile)
+        if (dragging is null || editor is null || sender is not ContentControl tile)
         {
             return;
         }
@@ -172,5 +214,119 @@ public sealed partial class MonitorLayoutView : UserControl
             monitor.SetPosition(dragCurrent.X, dragCurrent.Y);
             editor.NotifyMoved();
         }
+    }
+
+    private void Place(ContentControl tile, (int X, int Y) position)
+    {
+        Canvas.SetLeft(tile, (position.X * scale) + originX + (TileGap / 2));
+        Canvas.SetTop(tile, (position.Y * scale) + originY + (TileGap / 2));
+    }
+
+    // Keyboard on the desktop: Enter/Space picks up and drops, arrows move, Escape cancels.
+    private void OnTileKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        GamepadAction? action = e.Key switch
+        {
+            VirtualKey.Enter or VirtualKey.Space => GamepadAction.Accept,
+            VirtualKey.Escape when grabbed is not null => GamepadAction.Back,
+            VirtualKey.Up when grabbed is not null => GamepadAction.Up,
+            VirtualKey.Down when grabbed is not null => GamepadAction.Down,
+            VirtualKey.Left when grabbed is not null => GamepadAction.Left,
+            VirtualKey.Right when grabbed is not null => GamepadAction.Right,
+            _ => null,
+        };
+
+        if (action is { } value && HandleGamepad(value, sender as FrameworkElement))
+        {
+            e.Handled = true;
+        }
+    }
+
+    public bool HandleGamepad(GamepadAction action, FrameworkElement? focused)
+    {
+        if (grabbed is not null)
+        {
+            switch (action)
+            {
+                case GamepadAction.Up: MoveGrab(MoveDirection.Up); break;
+                case GamepadAction.Down: MoveGrab(MoveDirection.Down); break;
+                case GamepadAction.Left: MoveGrab(MoveDirection.Left); break;
+                case GamepadAction.Right: MoveGrab(MoveDirection.Right); break;
+                case GamepadAction.Accept: DropGrab(); break;
+                case GamepadAction.Back: CancelGrab(); break;
+                case GamepadAction.ScrollUp or GamepadAction.ScrollDown: return false;
+            }
+
+            return true;
+        }
+
+        if (action == GamepadAction.Accept && tiles.FirstOrDefault(t => ReferenceEquals(t.Value.Tile, focused)).Key is { } monitor)
+        {
+            BeginGrab(monitor);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void BeginGrab(MonitorViewModel monitor)
+    {
+        grabbed = monitor;
+        grabStart = (monitor.X, monitor.Y);
+        grabSlot = grabStart;
+        UpdateSelection();
+        GrabChanged?.Invoke(true);
+    }
+
+    private void MoveGrab(MoveDirection direction)
+    {
+        if (grabbed is null || editor is null)
+        {
+            return;
+        }
+
+        var others = editor.Monitors.Where(m => m.Enabled && m != grabbed).Select(m => m.ToConfig());
+        var slots = LayoutMath.AttachSlots(grabbed.ToConfig(), others);
+        if (LayoutMath.NextSlot(grabSlot, slots, direction) is { } next)
+        {
+            grabSlot = next;
+            Place(tiles[grabbed].Tile, next);
+        }
+    }
+
+    private void DropGrab()
+    {
+        if (grabbed is null || editor is null)
+        {
+            return;
+        }
+
+        var monitor = grabbed;
+        focusAfterRender = monitor;
+        grabbed = null;
+        GrabChanged?.Invoke(false);
+        if (grabSlot != grabStart)
+        {
+            monitor.SetPosition(grabSlot.X, grabSlot.Y);
+            editor.NotifyMoved();
+        }
+        else
+        {
+            UpdateSelection();
+            focusAfterRender = null;
+        }
+    }
+
+    private void CancelGrab()
+    {
+        if (grabbed is null)
+        {
+            return;
+        }
+
+        Place(tiles[grabbed].Tile, grabStart);
+        grabbed = null;
+        UpdateSelection();
+        GrabChanged?.Invoke(false);
     }
 }

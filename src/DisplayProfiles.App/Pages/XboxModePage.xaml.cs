@@ -1,10 +1,11 @@
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using DisplayProfiles.App.Controls;
 using DisplayProfiles.Core.Integration;
 
 namespace DisplayProfiles.App.Pages;
 
-public sealed partial class XboxModePage : Page
+public sealed partial class XboxModePage : Page, IControllerPage
 {
     private const string NoChange = "Don't change the displays";
 
@@ -14,6 +15,10 @@ public sealed partial class XboxModePage : Page
     {
         InitializeComponent();
     }
+
+    public IReadOnlyList<(string Button, string Text)> Hints { get; } = [("A", "Select"), ("B", "Back"), ("LB RB", "Sections")];
+
+    public bool OnPrimaryAction() => false;
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
@@ -53,7 +58,7 @@ public sealed partial class XboxModePage : Page
         return index + 1;
     }
 
-    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnSelectionChanged(object? sender, EventArgs e)
     {
         if (loading)
         {
@@ -61,7 +66,7 @@ public sealed partial class XboxModePage : Page
         }
 
         var service = App.Instance.Profiles;
-        Guid? Pick(ComboBox box) => box.SelectedIndex > 0 ? service.Data.Profiles[box.SelectedIndex - 1].Id : null;
+        Guid? Pick(OptionPicker box) => box.SelectedIndex > 0 ? service.Data.Profiles[box.SelectedIndex - 1].Id : null;
         var enter = Pick(EnterBox);
         var exit = Pick(ExitBox);
         service.Update(d => d with { Settings = d.Settings with { XboxEnterProfileId = enter, XboxExitProfileId = exit } });

@@ -11,9 +11,78 @@ public enum LayoutIssueKind
 
 public sealed record LayoutIssue(LayoutIssueKind Kind, string Message);
 
+public enum MoveDirection
+{
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
 /// <summary>Pure geometry helpers shared by the apply engine, the GUI layout editor and the tests.</summary>
 public static class LayoutMath
 {
+    /// <summary>
+    /// Every position where <paramref name="moving"/> touches the edge of another enabled monitor (aligned to its start,
+    /// centre or end) without overlapping any of them. Used to move a monitor with a controller one step at a time.
+    /// </summary>
+    public static IReadOnlyList<(int X, int Y)> AttachSlots(MonitorConfig moving, IEnumerable<MonitorConfig> others)
+    {
+        var targets = others.Where(o => o.Enabled && o.Key != moving.Key).ToList();
+        var slots = new HashSet<(int X, int Y)>();
+
+        foreach (var o in targets)
+        {
+            int[] xs = [o.X, o.Right - moving.Width, o.X + ((o.Width - moving.Width) / 2)];
+            int[] ys = [o.Y, o.Bottom - moving.Height, o.Y + ((o.Height - moving.Height) / 2)];
+
+            foreach (int y in ys)
+            {
+                slots.Add((o.Right, y));
+                slots.Add((o.X - moving.Width, y));
+            }
+
+            foreach (int x in xs)
+            {
+                slots.Add((x, o.Y - moving.Height));
+                slots.Add((x, o.Bottom));
+            }
+        }
+
+        return [.. slots
+            .Where(s => !targets.Any(t => Overlaps(moving with { X = s.X, Y = s.Y }, t)))
+            .OrderBy(s => s.X).ThenBy(s => s.Y)];
+    }
+
+    /// <summary>The slot lying most directly in the given direction from <paramref name="current"/>.</summary>
+    public static (int X, int Y)? NextSlot((int X, int Y) current, IReadOnlyList<(int X, int Y)> slots, MoveDirection direction)
+    {
+        static int Along((int X, int Y) d, MoveDirection dir) => dir switch
+        {
+            MoveDirection.Right => d.X,
+            MoveDirection.Left => -d.X,
+            MoveDirection.Down => d.Y,
+            _ => -d.Y,
+        };
+
+        static int Across((int X, int Y) d, MoveDirection dir) => dir is MoveDirection.Left or MoveDirection.Right ? d.Y : d.X;
+
+        var candidates = slots
+            .Select(s => (Slot: s, Delta: (X: s.X - current.X, Y: s.Y - current.Y)))
+            .Where(c => Along(c.Delta, direction) > 0)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        // Favour slots straight along the pressed direction; sideways drift counts double.
+        return candidates
+            .OrderBy(c => Along(c.Delta, direction) + (2L * Math.Abs(Across(c.Delta, direction))))
+            .ThenBy(c => c.Slot.X).ThenBy(c => c.Slot.Y)
+            .First().Slot;
+    }
+
     /// <summary>
     /// Makes a layout valid for Windows: exactly one primary among the enabled monitors, and the
     /// primary at (0,0) with every other enabled monitor shifted accordingly.

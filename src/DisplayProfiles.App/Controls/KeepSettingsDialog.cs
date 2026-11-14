@@ -10,6 +10,18 @@ internal static class KeepSettingsDialog
     /// <summary>Returns true if the user chose to keep the new settings.</summary>
     public static async Task<bool> ShowAsync(XamlRoot root, int seconds)
     {
+        if (ControllerUi.IsActive && OverlayHost.Current is { } overlay)
+        {
+            return await overlay.ShowConfirmAsync(
+                "Keep these display settings?",
+                string.Empty,
+                "Keep changes",
+                "Revert",
+                defaultToSecondary: true,
+                countdownSeconds: seconds,
+                countdownMessage: left => $"Your previous display settings will be restored in {left} seconds.");
+        }
+
         int remaining = seconds;
         var text = new TextBlock { TextWrapping = TextWrapping.Wrap };
         void UpdateText() => text.Text = $"Your previous display settings will be restored in {remaining} seconds.";

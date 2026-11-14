@@ -134,7 +134,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Grid.Column="2" AutomationProperties.Name="More options">
+                        <Button x:Name="MoreButton" Grid.Column="2" AutomationProperties.Name="More options" Click="OnMoreClick">
                             <FontIcon Glyph="&#xE712;" FontSize="16" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -210,21 +210,21 @@
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display resolution"
                                                          IsEnabled="{x:Bind Enabled, Mode=OneWay}">
-                                            <ComboBox MinWidth="200"
-                                                      ItemsSource="{x:Bind ResolutionLabels}"
-                                                      SelectedIndex="{x:Bind ResolutionIndex, Mode=TwoWay}" />
+                                            <controls:OptionPicker MinWidth="200" Title="Display resolution"
+                                                       ItemsSource="{x:Bind ResolutionLabels}"
+                                                       SelectedIndex="{x:Bind ResolutionIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Refresh rate"
                                                          IsEnabled="{x:Bind Enabled, Mode=OneWay}">
-                                            <ComboBox MinWidth="200"
-                                                      ItemsSource="{x:Bind RefreshLabels, Mode=OneWay}"
-                                                      SelectedIndex="{x:Bind RefreshIndex, Mode=TwoWay}" />
+                                            <controls:OptionPicker MinWidth="200" Title="Refresh rate"
+                                                       ItemsSource="{x:Bind RefreshLabels, Mode=OneWay}"
+                                                       SelectedIndex="{x:Bind RefreshIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display orientation"
                                                          IsEnabled="{x:Bind Enabled, Mode=OneWay}">
-                                            <ComboBox MinWidth="200"
-                                                      ItemsSource="{x:Bind Orientations}"
-                                                      SelectedIndex="{x:Bind OrientationIndex, Mode=TwoWay}" />
+                                            <controls:OptionPicker MinWidth="200" Title="Display orientation"
+                                                       ItemsSource="{x:Bind Orientations}"
+                                                       SelectedIndex="{x:Bind OrientationIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                     </tk:SettingsExpander.Items>
                                 </tk:SettingsExpander>

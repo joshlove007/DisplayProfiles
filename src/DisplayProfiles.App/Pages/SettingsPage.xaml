@@ -2,6 +2,7 @@
     x:Class="DisplayProfiles.App.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:DisplayProfiles.App.Controls"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
 
     <ScrollViewer x:Name="PageScroll" Padding="36,0,36,24">
@@ -43,8 +44,16 @@
                 <tk:SettingsCard.HeaderIcon>
                     <FontIcon Glyph="&#xE916;" />
                 </tk:SettingsCard.HeaderIcon>
-                <NumberBox x:Name="TimeoutBox" Minimum="5" Maximum="120" SmallChange="5"
-                           SpinButtonPlacementMode="Inline" MinWidth="140" ValueChanged="OnTimeoutChanged" />
+                <controls:OptionPicker x:Name="TimeoutBox" Title="Keep-changes timeout" MinWidth="200" SelectionChanged="OnTimeoutChanged" />
+            </tk:SettingsCard>
+
+            <tk:SettingsCard
+                Header="Controller layout"
+                Description="Large, dark, controller-friendly layout. Automatic uses it while the PC is in Xbox mode.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE7FC;" />
+                </tk:SettingsCard.HeaderIcon>
+                <controls:OptionPicker x:Name="ControllerBox" Title="Controller layout" MinWidth="200" SelectionChanged="OnControllerModeChanged" />
             </tk:SettingsCard>
 
             <TextBlock Text="Shortcuts" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="1,24,0,4" />
