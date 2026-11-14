@@ -57,6 +57,29 @@ public class WidgetBridgeTests : IDisposable
     }
 
     [Fact]
+    public void Cli_failures_are_published_for_the_widget()
+    {
+        string folder = Path.Combine(dir, "LocalState");
+        var snapshot = WidgetBridge.BuildSnapshot(service, "TV is not responding");
+
+        Assert.Equal("TV is not responding", snapshot.LastError);
+        Assert.Null(WidgetBridge.BuildSnapshot(service).LastError);
+
+        Assert.True(WidgetBridge.Publish(service, folder, "TV is not responding"));
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, WidgetBridge.SnapshotFileName)));
+        Assert.Equal("TV is not responding", json.RootElement.GetProperty("lastError").GetString());
+    }
+
+    [Fact]
+    public void Publish_records_the_last_applied_profile()
+    {
+        var living = service.Data.Profiles.Single(p => p.Name == "Living room");
+        service.Apply(living);
+
+        Assert.Equal(living.Id, WidgetBridge.BuildSnapshot(service).LastAppliedProfileId);
+    }
+
+    [Fact]
     public void Publish_writes_profiles_with_the_active_one_marked()
     {
         string folder = Path.Combine(dir, "LocalState");

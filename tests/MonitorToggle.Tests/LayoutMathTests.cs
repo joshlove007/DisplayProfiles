@@ -74,6 +74,17 @@ public class LayoutMathTests
     }
 
     [Fact]
+    public void AreEquivalent_treats_59_and_60_hz_as_the_same_mode()
+    {
+        var saved = new[] { Mon("A", 0, 0, primary: true) with { RefreshHz = 60 } };
+        var live = new[] { Mon("A", 0, 0, primary: true) with { RefreshHz = 59 } };
+        var different = new[] { Mon("A", 0, 0, primary: true) with { RefreshHz = 144 } };
+
+        Assert.True(LayoutMath.AreEquivalent(saved, live));
+        Assert.False(LayoutMath.AreEquivalent(saved, different));
+    }
+
+    [Fact]
     public void AreEquivalent_ignores_disabled_monitors_and_origin_offset_but_not_position()
     {
         var one = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0), Mon("C", 0, 0, enabled: false) };

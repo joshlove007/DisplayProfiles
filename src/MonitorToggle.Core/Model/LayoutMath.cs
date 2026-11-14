@@ -198,7 +198,8 @@ public static class LayoutMath
         {
             var l = left[i];
             var r = right[i];
-            bool sameRefresh = l.RefreshHz == 0 || r.RefreshHz == 0 || l.RefreshHz == r.RefreshHz;
+            // Windows reports 59.94 Hz modes as 59 and asks for 60, so allow a 1 Hz difference.
+            bool sameRefresh = l.RefreshHz == 0 || r.RefreshHz == 0 || Math.Abs(l.RefreshHz - r.RefreshHz) <= 1;
             if (l.Key != r.Key || l.IsPrimary != r.IsPrimary || l.X != r.X || l.Y != r.Y ||
                 l.Width != r.Width || l.Height != r.Height || l.Orientation != r.Orientation || !sameRefresh)
             {

@@ -30,6 +30,9 @@ public sealed partial class WidgetPage : Page
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private XboxGameBarWidget? widget;
     private DateTimeOffset lastWrite;
+    private DateTimeOffset snapshotUpdated;
+    private Guid? lastApplied;
+    private string? lastError;
     private Guid? pendingProfile;
     private DateTimeOffset pendingSince;
 
@@ -116,6 +119,14 @@ public sealed partial class WidgetPage : Page
                     p.GetProperty("isActive").GetBoolean()));
             }
 
+            lastApplied = json.RootElement.TryGetProperty("lastAppliedProfileId", out var applied) && applied.ValueKind == JsonValueKind.String
+                ? applied.GetGuid()
+                : null;
+            lastError = json.RootElement.TryGetProperty("lastError", out var err) && err.ValueKind == JsonValueKind.String
+                ? err.GetString()
+                : null;
+            snapshotUpdated = json.RootElement.TryGetProperty("updated", out var updated) ? updated.GetDateTimeOffset() : DateTimeOffset.MinValue;
+
             lastWrite = written;
             if (profiles.Count == 0)
             {
@@ -150,10 +161,18 @@ public sealed partial class WidgetPage : Page
         }
 
         var entries = (ProfileList.ItemsSource as IEnumerable<ProfileEntry>) ?? [];
-        if (entries.Any(p => p.Id == id && p.IsActive))
+        var target = entries.FirstOrDefault(p => p.Id == id);
+        bool fresh = snapshotUpdated >= pendingSince;
+
+        if (fresh && lastError is not null)
         {
             pendingProfile = null;
-            SetStatus(null);
+            SetStatus($"Couldn't switch: {lastError}");
+        }
+        else if (target is not null && (target.IsActive || (fresh && lastApplied == id)))
+        {
+            pendingProfile = null;
+            SetStatus($"Switched to {target.Name}.");
         }
         else if (DateTimeOffset.UtcNow - pendingSince > TimeSpan.FromSeconds(25))
         {

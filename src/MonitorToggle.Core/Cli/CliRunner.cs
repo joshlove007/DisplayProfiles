@@ -121,6 +121,7 @@ public static class CliRunner
         if (!result.Success)
         {
             error.WriteLine(result.Error);
+            WidgetBridge.Publish(service, error: result.Error ?? "Windows did not apply the display settings.");
             return Failure;
         }
 

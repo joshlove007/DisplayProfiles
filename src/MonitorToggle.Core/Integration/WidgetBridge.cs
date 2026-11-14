@@ -14,6 +14,12 @@ public sealed record WidgetSnapshot
     public DateTimeOffset Updated { get; init; } = DateTimeOffset.UtcNow;
 
     public IReadOnlyList<WidgetProfile> Profiles { get; init; } = [];
+
+    /// <summary>The profile most recently applied successfully, even if the live layout has since drifted from it.</summary>
+    public Guid? LastAppliedProfileId { get; init; }
+
+    /// <summary>Why the most recent switch failed, if it did; cleared by the next publish without an error.</summary>
+    public string? LastError { get; init; }
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
@@ -46,17 +52,19 @@ public static class WidgetBridge
         return package is null ? null : Path.Combine(package, "LocalState");
     }
 
-    public static WidgetSnapshot BuildSnapshot(ProfileService service)
+    public static WidgetSnapshot BuildSnapshot(ProfileService service, string? error = null)
     {
         var active = service.FindActiveProfile();
         return new WidgetSnapshot
         {
             Profiles = [.. service.Data.Profiles.Select(p => new WidgetProfile(p.Id, p.Name, p.Id == active?.Id))],
+            LastAppliedProfileId = service.Data.Settings.LastAppliedProfileId,
+            LastError = error,
         };
     }
 
     /// <summary>Writes the snapshot for the widget. Returns false when the widget isn't installed.</summary>
-    public static bool Publish(ProfileService service, string? folderOverride = null)
+    public static bool Publish(ProfileService service, string? folderOverride = null, string? error = null)
     {
         string? folder = folderOverride ?? FindWidgetDataFolder();
         if (folder is null)
@@ -71,7 +79,7 @@ public static class WidgetBridge
             string temp = path + ".tmp";
             using (var stream = File.Create(temp))
             {
-                JsonSerializer.Serialize(stream, BuildSnapshot(service), WidgetJsonContext.Default.WidgetSnapshot);
+                JsonSerializer.Serialize(stream, BuildSnapshot(service, error), WidgetJsonContext.Default.WidgetSnapshot);
             }
 
             File.Move(temp, path, overwrite: true);

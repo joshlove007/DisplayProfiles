@@ -35,6 +35,14 @@ if (-not $trusted) {
     Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile', '-Command', $command
 }
 
+$msixVersion = [regex]::Match($msix.Name, '_(\d+\.\d+\.\d+\.\d+)_').Groups[1].Value
+$installed = Get-AppxPackage $packageName
+if ($installed -and $installed.Version -eq $msixVersion) {
+    # Windows blocks reinstalling different contents under the same version, so remove the old build first.
+    Write-Host "Removing the installed $msixVersion build first..." -ForegroundColor Yellow
+    $installed | Remove-AppxPackage
+}
+
 $dependencies = Get-ChildItem (Join-Path $msix.Directory.FullName 'Dependencies\x64') -Filter '*.appx' -ErrorAction SilentlyContinue |
     ForEach-Object FullName
 
