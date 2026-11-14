@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Game Bar widget. Game Bar can only host UWP XAML apps, and the UWP XAML compiler ships with Visual Studio's
+    MSBuild, so this project is NOT part of MonitorToggle.slnx / `dotnet build`. Build it with tools\Build-Widget.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>MonitorToggle.Widget</RootNamespace>
+    <AssemblyName>MonitorToggle.Widget</AssemblyName>
+    <UseUwp>true</UseUwp>
+    <UseUwpTools>true</UseUwpTools>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <!-- The UWP tooling adds Microsoft.Windows.SDK.BuildTools implicitly, which central package management rejects. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <XboxGameBarRid Condition="'$(Platform)' == 'ARM64'">win10-arm64</XboxGameBarRid>
+    <XboxGameBarRid Condition="'$(XboxGameBarRid)' == ''">win10-x64</XboxGameBarRid>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- UndefineProperties: the MSIX tooling's Pack target collides with NuGet's Pack when
+         GenerateAppxPackageOnBuild flows into referenced projects. -->
+    <ProjectReference Include="..\MonitorToggle.Widget.GameBarProjection\MonitorToggle.Widget.GameBarProjection.csproj"
+                      UndefineProperties="GenerateAppxPackageOnBuild;AppxPackageDir" />
+    <PackageReference Include="Microsoft.Gaming.XboxGameBar" Version="7.2.240903001" GeneratePathProperty="true" ExcludeAssets="all" />
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\runtimes\$(XboxGameBarRid)\native\Microsoft.Gaming.XboxGameBar.dll" Link="Microsoft.Gaming.XboxGameBar.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\runtimes\$(XboxGameBarRid)\native\Microsoft.Gaming.XboxGameBar.pri" Link="Microsoft.Gaming.XboxGameBar.pri" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\lib\uap10.0\Microsoft.Gaming.XboxGameBar.winmd" Link="Microsoft.Gaming.XboxGameBar.winmd" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Metadata Based Marshaling resolves the Private.* interfaces from this winmd at runtime. -->
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\private\Microsoft.Gaming.XboxGameBar.Private.winmd" Link="Microsoft.Gaming.XboxGameBar.Private.winmd" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="GameBar\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

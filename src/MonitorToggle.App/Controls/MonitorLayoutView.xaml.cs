@@ -16,6 +16,9 @@ public sealed partial class MonitorLayoutView : UserControl
     private const double MaxScale = 0.12;
     private const double SnapDistance = 12;
 
+    // Tiles are drawn slightly smaller than their monitors so touching displays show a thin gap, as in Windows Settings.
+    private const double TileGap = 3;
+
     private readonly Dictionary<MonitorViewModel, (Border Tile, TextBlock Number)> tiles = [];
     private ProfileEditorViewModel? editor;
     private double scale = MaxScale;
@@ -86,8 +89,8 @@ public sealed partial class MonitorLayoutView : UserControl
             };
             var tile = new Border
             {
-                Width = monitor.Width * scale,
-                Height = monitor.Height * scale,
+                Width = Math.Max(1, (monitor.Width * scale) - TileGap),
+                Height = Math.Max(1, (monitor.Height * scale) - TileGap),
                 Child = new Grid { Children = { new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { number } } } },
                 Tag = monitor,
             };
@@ -99,8 +102,8 @@ public sealed partial class MonitorLayoutView : UserControl
             tile.PointerEntered += (_, _) => ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
             tile.PointerExited += (_, _) => ProtectedCursor = null;
 
-            Canvas.SetLeft(tile, (monitor.X * scale) + originX);
-            Canvas.SetTop(tile, (monitor.Y * scale) + originY);
+            Canvas.SetLeft(tile, (monitor.X * scale) + originX + (TileGap / 2));
+            Canvas.SetTop(tile, (monitor.Y * scale) + originY + (TileGap / 2));
             Surface.Children.Add(tile);
             tiles[monitor] = (tile, number);
         }
@@ -150,8 +153,8 @@ public sealed partial class MonitorLayoutView : UserControl
         dragCurrent = LayoutMath.Snap(moving, proposedX, proposedY, others, (int)(SnapDistance / scale));
 
         // Only the tile moves while dragging; the layout is committed on release.
-        Canvas.SetLeft(tile, (dragCurrent.X * scale) + originX);
-        Canvas.SetTop(tile, (dragCurrent.Y * scale) + originY);
+        Canvas.SetLeft(tile, (dragCurrent.X * scale) + originX + (TileGap / 2));
+        Canvas.SetTop(tile, (dragCurrent.Y * scale) + originY + (TileGap / 2));
     }
 
     private void OnPointerReleased(object sender, PointerRoutedEventArgs e)

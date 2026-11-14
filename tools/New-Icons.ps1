@@ -57,3 +57,22 @@ Save-Ico (Join-Path $OutDir 'MonitorToggle.ico') @(16, 24, 32, 48, 64, 128, 256)
 Save-Ico (Join-Path $OutDir 'tray-light.ico') @(16, 20, 24, 32, 48) ([System.Drawing.Color]::FromArgb(255, 26, 26, 26)) $clear 0.95
 Save-Ico (Join-Path $OutDir 'tray-dark.ico') @(16, 20, 24, 32, 48) ([System.Drawing.Color]::White) $clear 0.95
 Write-Host "Icons written to $OutDir"
+
+# Game Bar widget package assets.
+$WidgetDir = Join-Path $PSScriptRoot '..\src\MonitorToggle.Widget\Assets'
+New-Item -ItemType Directory -Force $WidgetDir | Out-Null
+[System.IO.File]::WriteAllBytes((Join-Path $WidgetDir 'Square44x44Logo.png'), (New-GlyphPng 44 ([System.Drawing.Color]::White) $accent 0.62))
+[System.IO.File]::WriteAllBytes((Join-Path $WidgetDir 'Square150x150Logo.png'), (New-GlyphPng 150 ([System.Drawing.Color]::White) $accent 0.62))
+[System.IO.File]::WriteAllBytes((Join-Path $WidgetDir 'StoreLogo.png'), (New-GlyphPng 50 ([System.Drawing.Color]::White) $accent 0.62))
+
+$splash = New-Object System.Drawing.Bitmap 620, 300
+$g = [System.Drawing.Graphics]::FromImage($splash)
+$g.Clear($accent)
+$g.TextRenderingHint = 'AntiAliasGridFit'
+$font = New-Object System.Drawing.Font 'Segoe Fluent Icons', 120, ([System.Drawing.FontStyle]::Regular), ([System.Drawing.GraphicsUnit]::Pixel)
+$format = New-Object System.Drawing.StringFormat; $format.Alignment = 'Center'; $format.LineAlignment = 'Center'
+$g.DrawString($glyph, $font, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 0, 0, 620, 300), $format)
+$g.Dispose()
+$splash.Save((Join-Path $WidgetDir 'SplashScreen.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+$splash.Dispose()
+Write-Host "Widget assets written to $WidgetDir"
