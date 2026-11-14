@@ -126,9 +126,20 @@ Save-Ico (Join-Path $AppAssets 'tray-dark.ico') @(16, 20, 24, 32, 48) 'mono' ([S
 $titleBar = New-IconBitmap 32 'color'
 [System.IO.File]::WriteAllBytes((Join-Path $AppAssets 'titlebar.png'), (Get-Png $titleBar)); $titleBar.Dispose()
 
-foreach ($t in @(@('Square44x44Logo.png', 44), @('Square150x150Logo.png', 150), @('StoreLogo.png', 50))) {
+foreach ($t in @(@('Square150x150Logo.png', 150), @('StoreLogo.png', 50))) {
     $b = New-IconBitmap $t[1] 'tile' ([System.Drawing.Color]::White) $t[1] $t[1] 0.86
     [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets $t[0]), (Get-Png $b)); $b.Dispose()
+}
+
+# Square44x44Logo.png itself is what Game Bar draws on its toolbar, so it is the white glyph on transparent.
+# Start, the taskbar and app lists use the target-size files, which keep the accent tile.
+$b = New-IconBitmap 44 'mono' ([System.Drawing.Color]::White) 44 44 0.92
+[System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets 'Square44x44Logo.png'), (Get-Png $b)); $b.Dispose()
+foreach ($size in 16, 24, 32, 48, 256) {
+    $b = New-IconBitmap $size 'tile' ([System.Drawing.Color]::White) $size $size 0.86
+    [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets "Square44x44Logo.targetsize-$size.png"), (Get-Png $b)); $b.Dispose()
+    $b = New-IconBitmap $size 'color'
+    [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets "Square44x44Logo.targetsize-${size}_altform-unplated.png"), (Get-Png $b)); $b.Dispose()
 }
 $splash = New-IconBitmap 300 'tile' ([System.Drawing.Color]::White) 620 300 0.7
 [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets 'SplashScreen.png'), (Get-Png $splash)); $splash.Dispose()
