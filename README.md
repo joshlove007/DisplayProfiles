@@ -1,80 +1,118 @@
-# Display Profiles
+<p align="center">
+  <img src="src/DisplayProfiles.App/Assets/titlebar.png" alt="" width="64" />
+</p>
 
-Profile-based display switcher for Windows 11, written in C# on .NET 11.
+<h1 align="center">Display Profiles</h1>
 
-Define several monitor layouts ("Desk", "TV", ...): which displays are on, which is the main display, resolution, refresh rate,
-orientation and arrangement. Switch between them with one click, a shortcut, a command, the tray icon, or an Xbox controller
-through Xbox Game Bar. A profile can also be applied automatically when the PC enters Xbox mode.
+<p align="center">
+  Save your monitor layouts as profiles and switch between them in one click, one command, or one button press on a controller.
+  <br />
+  A native-looking Windows 11 app, written in C# on .NET 11 and WinUI 3.
+</p>
 
-The app uses WinUI 3 and follows the system light/dark theme, accent colour and Segoe Fluent icons, so it looks like part of
-Windows.
+<p align="center">
+  <a href="https://github.com/joshlove007/DisplayProfiles/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/joshlove007/DisplayProfiles/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/joshlove007/DisplayProfiles/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/joshlove007/DisplayProfiles?include_prereleases&label=release" /></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/joshlove007/DisplayProfiles" /></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/profiles-light.png" alt="The profile editor in the light theme" width="49%" />
+  <img src="docs/images/profiles-dark.png" alt="The profile editor in the dark theme" width="49%" />
+</p>
+
+## Why
+
+Going from "two monitors at my desk" to "the TV from the couch" in Windows means opening Display settings, enabling the TV,
+making it the main display, and then doing the whole dance in reverse to come back. Display Profiles turns each of those
+setups into a named profile that you apply with a single action. It was built for exactly that: a desk with two monitors,
+a TV for gaming, and an Xbox controller.
 
 ## Features
 
-- **Profile editor** with a draggable, snapping monitor map (like Settings > Display), per-display on/off, main display,
+- **Profile editor** with a draggable, snapping monitor map like Settings > Display, per-display on/off, main display,
   resolution, refresh rate and orientation. Edits save automatically.
-- **Safe applying**: the app verifies that every monitor really came up (retrying if a TV is slow to wake), restores your
+- **Safe applying.** The app checks that every monitor really came up (retrying if a TV is slow to wake), restores your
   previous layout if Windows rejects the change, and shows a "Keep these display settings?" prompt when you apply from the app.
-- **Tray icon** with a profile menu, **command line** and **shortcuts** (`DisplayProfiles.exe apply "TV"`, `toggle`, `next`).
-- **Xbox mode**: pick a profile to apply when Xbox mode starts (and optionally when it ends). Detection uses Windows'
-  gaming-experience API.
-- **Game Bar widget**: pick a profile with a controller from Xbox Game Bar.
-- **Controller mode**: in Xbox mode the app switches to a dark, Xbox-green, full-screen layout with large controls and no
-  window buttons, and everything can be done with a gamepad (see below).
-- Imports the profiles of the original `toggle-monitor.ps1` script on first run.
+- **Switch from anywhere:** the tray icon, the command line, desktop and Start menu shortcuts, or the Xbox Game Bar widget.
+- **Xbox mode.** Choose a profile to apply when the PC enters Xbox mode, and optionally another for when it leaves.
+- **Controller mode.** In Xbox mode the app switches to a large, full-screen, controller-friendly layout that you can drive
+  entirely with a gamepad, including moving displays around.
+- **Looks like Windows.** WinUI 3, Mica, Segoe Fluent icons and your system accent colour, in light or dark.
+- **Yours to keep.** Profiles are a plain JSON file in `%APPDATA%\DisplayProfiles`.
 
-## Build and run
+<p align="center">
+  <img src="docs/images/display-options.png" alt="Per-display options" width="49%" />
+  <img src="docs/images/xbox-mode-page.png" alt="Choosing the profiles for Xbox mode" width="49%" />
+</p>
 
-Requires the [.NET 11 SDK](https://dotnet.microsoft.com/download) on Windows 11.
+## Install
 
-```powershell
-dotnet build DisplayProfiles.slnx
-dotnet test --solution DisplayProfiles.slnx
-dotnet run --project src/DisplayProfiles.App
-```
+Download the latest build from the [Releases](https://github.com/joshlove007/DisplayProfiles/releases) page.
 
-Everything above is SDK-style and works with VS Code (C# Dev Kit). `.vscode/tasks.json` has build, test and publish tasks.
+| File | What it is |
+|---|---|
+| `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed. |
+| `DisplayProfiles-Setup-<version>-arm64.exe` | Installer for Windows on ARM. |
+| `DisplayProfiles-<version>-<arch>-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
+| `DisplayProfiles-GameBarWidget-<version>.zip` | The optional Xbox Game Bar widget (see below). |
 
-### Command line
+> [!NOTE]
+> The builds are **not code-signed yet**, so Windows SmartScreen may show "Windows protected your PC" the first time you run
+> the installer. Choose **More info > Run anyway**. The releases are built by [GitHub Actions](.github/workflows/release.yml)
+> from the tagged source, so you can compare them with what is in this repository.
 
-```text
-DisplayProfiles.exe apply <profile>   switch to a profile (name, unique prefix, or id)
-DisplayProfiles.exe toggle | next     switch to the next profile in the list
-DisplayProfiles.exe list | current    show profiles / the active one
-DisplayProfiles.exe capture <name>    save the current layout as a profile
-DisplayProfiles.exe --background      start only the tray icon
-DisplayProfiles.exe --page xbox       open the app on a page (profiles, xbox, settings)
-DisplayProfiles.exe --xbox            force the controller layout (--desktop forces the normal one)
-DisplayProfiles.exe --xbox --windowed controller layout in a normal window, handy for testing
-```
-
-Settings > Shortcuts creates a shortcut per profile on the desktop or in the Start menu. Pin one in the Game Bar
-"LaunchDeck" widget if you prefer that to the DisplayProfiles widget.
+Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is included.
 
 ### Xbox Game Bar widget
 
-Game Bar can only host UWP XAML apps, and the UWP XAML compiler ships with Visual Studio's MSBuild, so the widget is the one
-project that `dotnet build` can't build. It needs Visual Studio or the Build Tools with the **Universal Windows Platform build
-tools** workload.
+The widget lists your profiles inside Game Bar (Win + G) so you can switch with a controller. Game Bar widgets have to be
+installed as a package, and the package is signed with a self-signed certificate, so the installer script needs to trust it
+once (it asks for administrator rights for that).
 
-```powershell
-.\tools\Build-Widget.ps1      # builds artifacts\widget\... (creates a self-signed signing certificate)
-.\tools\Install-Widget.ps1    # trusts the certificate (asks for admin once) and installs the package
+1. Unzip `DisplayProfiles-GameBarWidget-<version>.zip`.
+2. Run `powershell -ExecutionPolicy Bypass -File .\Install-Widget.ps1` in that folder.
+3. Open Game Bar, open the widget menu and add **Display Profiles**.
+
+Display Profiles has to be running in the background (turn on **Start with Windows** in Settings). To remove the widget, run
+the script again with `-Uninstall`.
+
+## Using it
+
+1. Open Display Profiles. On first run it creates a profile from your current layout. (If it finds the original
+   `toggle-monitor.ps1` script it imports those profiles instead.)
+2. Arrange your displays the way you want them, then add another profile for your other setup.
+3. Press **Apply** to switch. From then on you can use any of these:
+
+```text
+DisplayProfiles.exe apply "TV"        switch to a profile (name, unique prefix, or id)
+DisplayProfiles.exe toggle            switch to the next profile in the list
+DisplayProfiles.exe list              list profiles; the active one is marked with *
+DisplayProfiles.exe current           show the active profile
+DisplayProfiles.exe capture "Name"    save the current layout as a new profile
+DisplayProfiles.exe --background      start only the tray icon
 ```
 
-Then open Game Bar (Win + G), open the widget menu and add **DisplayProfiles**. The widget is sandboxed, so it never touches the
-displays itself: the app publishes the profile list into the widget's data folder and registers a `displayprofiles:` link
-(`displayprofiles:apply/<id>`, `displayprofiles:next`) that the widget launches to ask the app to switch.
+Settings > Shortcuts creates a shortcut per profile on the desktop or in the Start menu, and a single "Next profile"
+shortcut that works like a toggle button. `displayprofiles:apply/TV` and `displayprofiles:next` links work too.
 
 ### Xbox mode
 
-Enable **Start with Windows** in Settings so the tray app is running when Xbox mode starts, then choose profiles on the
-Xbox mode page.
+Turn on **Start with Windows** so the app is running when Xbox mode starts, then choose the profiles to apply on the Xbox
+mode page. While the PC is in Xbox mode the app uses its controller layout.
 
 ### Controller mode
 
-While the PC is in Xbox mode (or when Settings > Controller layout is set to *Always on*) the app uses a controller layout.
-Any XInput gamepad works; the on-screen prompts at the bottom show what each button does.
+<p align="center">
+  <img src="docs/images/controller-dark.png" alt="Controller mode, dark theme" width="49%" />
+  <img src="docs/images/controller-light.png" alt="Controller mode, light theme" width="49%" />
+  <img src="docs/images/controller-classic.png" alt="Controller mode, classic theme" width="49%" />
+  <img src="docs/images/controller-move.png" alt="Moving a display with the D-pad" width="49%" />
+</p>
+
+The controller layout is full screen with no window buttons, scaled up for the couch, and has three themes
+(**Dark**, **Light** and **Classic**, the original green look). Any XInput gamepad works. The prompts along the bottom show
+what each button does at that moment.
 
 | Button | Action |
 |---|---|
@@ -86,20 +124,69 @@ Any XInput gamepad works; the on-screen prompts at the bottom show what each but
 | Right stick | Scroll |
 
 To arrange displays, focus a monitor in the map and press **A** to pick it up, move it with the D-pad (it jumps between
-positions that touch another display) and press **A** to drop it or **B** to cancel. Lists open as large pick-lists and the
+positions that touch another display), then press **A** to drop it or **B** to cancel. Lists open as large pick-lists, and the
 "Keep these display settings?" prompt becomes a full-width overlay with a countdown.
 
-The same actions work from a keyboard: arrows, Enter/Space, Esc, PageUp/PageDown and Y.
+<p align="center">
+  <img src="docs/images/controller-picker.png" alt="A pick-list in controller mode" width="60%" />
+</p>
+
+The same actions work from a keyboard: arrow keys, Enter or Space, Esc, PageUp and PageDown, and Y.
+
+## Settings
+
+<p align="center">
+  <img src="docs/images/settings.png" alt="The Settings page" width="60%" />
+</p>
+
+- **Theme.** On the desktop: Dark, Light or Automatic (System). In controller mode: Light, Dark or Classic.
+- **Controller layout.** Automatic (in Xbox mode), Always on or Always off.
+- **Keep-changes timeout.** How long the "Keep these display settings?" prompt waits before reverting.
+- **Start with Windows.** Run in the background when you sign in.
+
+Command line flags for testing: `--xbox` forces the controller layout, `--desktop` forces the normal one, and `--windowed`
+shows the controller layout in a normal window.
+
+## How it works
+
+The short version: the app talks to the Windows display APIs directly, keeps profiles in a JSON file, and uses a small
+background process to react to Xbox mode. [How it works](docs/how-it-works.md) has the details, including how the Game Bar
+widget talks to the app and how controller navigation is built.
+
+## Build from source
+
+Requires the [.NET 11 SDK](https://dotnet.microsoft.com/download) on Windows 11.
+
+```powershell
+dotnet build DisplayProfiles.slnx
+dotnet test --solution DisplayProfiles.slnx
+dotnet run --project src/DisplayProfiles.App
+```
+
+Everything is SDK-style and works with VS Code (C# Dev Kit); `.vscode/tasks.json` has build, test and publish tasks. The
+Game Bar widget is the one project `dotnet build` can't build, because Game Bar needs a UWP XAML app and that compiler ships
+with Visual Studio. With the Visual Studio Build Tools (Universal Windows Platform workload) installed:
+
+```powershell
+.\tools\Build-Widget.ps1      # builds artifacts\widget\... and creates a self-signed certificate
+.\tools\Install-Widget.ps1    # trusts the certificate (asks for admin once) and installs the package
+```
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `src/DisplayProfiles.Core` | Display engine, profiles, CLI, Xbox mode detection, shortcuts, widget bridge |
-| `src/DisplayProfiles.App` | WinUI 3 app: editor, tray icon, single-instance host |
-| `src/DisplayProfiles.Widget*` | Game Bar widget and its Game Bar SDK projection (`DisplayProfiles.Widget.slnx`) |
+| `src/DisplayProfiles.Core` | Display engine, profiles, CLI, Xbox mode detection, shortcuts, widget bridge, gamepad logic |
+| `src/DisplayProfiles.App` | WinUI 3 app: editor, tray icon, controller mode |
+| `src/DisplayProfiles.Widget*` | Game Bar widget and its Game Bar SDK projection |
 | `tests/DisplayProfiles.Tests` | xUnit tests |
-| `tools/` | Icon generator and widget build/install scripts |
+| `installer/` | Inno Setup script for the installer |
+| `tools/` | Icon generator and widget build and install scripts |
+| `docs/` | Documentation and screenshots |
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
