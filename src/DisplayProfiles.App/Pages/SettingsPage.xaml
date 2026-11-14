@@ -5,6 +5,8 @@
     xmlns:controls="using:DisplayProfiles.App.Controls"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
 
+    <!-- The width cap sits outside the ScrollViewer, where it centres the content properly. It is the 920 content width plus padding. -->
+    <Grid MaxWidth="992">
     <ScrollViewer x:Name="PageScroll" Padding="36,0,36,24">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup>
@@ -26,7 +28,7 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <StackPanel Spacing="4" MaxWidth="920">
+        <StackPanel Spacing="4">
             <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" Margin="0,16,0,16" />
 
             <tk:SettingsCard
@@ -104,4 +106,5 @@
             </tk:SettingsCard>
         </StackPanel>
     </ScrollViewer>
+    </Grid>
 </Page>
