@@ -114,23 +114,23 @@ public class ProfileServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_retries_once_when_windows_silently_drops_a_monitor()
+    public void Apply_retries_when_windows_silently_drops_a_monitor()
     {
-        var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 1 };
+        var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 2 };
         var service = Create(fake);
         var tv = Profile.Create("TV", [Mon("TV", 0, 0, 3840, 2160, primary: true)]);
 
         var result = service.Apply(tv);
 
         Assert.True(result.Success);
-        Assert.Equal(2, fake.Applied.Count);
+        Assert.Equal(3, fake.Applied.Count);
         Assert.Equal("TV", service.CaptureLayout().Single(m => m.Enabled).Key);
     }
 
     [Fact]
     public void Apply_fails_and_reverts_when_a_monitor_never_comes_up()
     {
-        var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 2 };
+        var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 3 };
         var service = Create(fake);
         var before = service.CaptureLayout();
         var tv = Profile.Create("TV", [Mon("TV", 0, 0, 3840, 2160, primary: true)]);

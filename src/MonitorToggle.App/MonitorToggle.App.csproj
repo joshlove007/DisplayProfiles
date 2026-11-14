@@ -13,6 +13,8 @@
     <ApplicationIcon>Assets\MonitorToggle.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- The app is neither trimmed nor AOT-compiled, so collection expressions over read-only interfaces are fine. -->
+    <NoWarn>$(NoWarn);CsWinRT1032</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +22,7 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
 
   <ItemGroup>

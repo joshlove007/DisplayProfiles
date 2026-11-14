@@ -19,3 +19,7 @@ dotnet_sort_system_directives_first = true
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1816.severity = none
+
+# View models expose instance members purely for x:Bind.
+[src/MonitorToggle.App/**.cs]
+dotnet_diagnostic.CA1822.severity = none

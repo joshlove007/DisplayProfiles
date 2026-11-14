@@ -129,18 +129,19 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
 
         try
         {
-            Displays.Apply(plan);
-            if (!WaitUntilApplied(plan, out var missing))
+            // A sleeping TV can ignore the first requests while Windows still reports success, so retry a few times.
+            List<string> missing = [];
+            for (int attempt = 0; attempt < MaxApplyAttempts; attempt++)
             {
-                // A sleeping TV sometimes ignores the first request; Windows still reports success.
                 Displays.Apply(plan);
-                if (!WaitUntilApplied(plan, out missing))
+                if (WaitUntilApplied(plan, out missing))
                 {
-                    throw new DisplayApplyException($"Windows did not turn on {string.Join(", ", missing)}.");
+                    return new ApplyResult(true, null, plan.Warnings, previous);
                 }
             }
 
-            return new ApplyResult(true, null, plan.Warnings, previous);
+            throw new DisplayApplyException(
+                $"Windows did not turn on {string.Join(", ", missing)}. Check that it is powered on and set to the right input.");
         }
         catch (DisplayApplyException ex)
         {
@@ -161,6 +162,8 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
 
     /// <summary>How long to let Windows settle before checking that the monitors really came up.</summary>
     public TimeSpan SettleDelay { get; init; } = TimeSpan.FromMilliseconds(1500);
+
+    private const int MaxApplyAttempts = 3;
 
     private bool WaitUntilApplied(ApplyPlan plan, out List<string> missing)
     {

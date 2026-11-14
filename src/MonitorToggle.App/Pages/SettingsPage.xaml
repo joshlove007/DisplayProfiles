@@ -1,0 +1,71 @@
+<Page
+    x:Class="MonitorToggle.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tk="using:CommunityToolkit.WinUI.Controls">
+
+    <ScrollViewer Padding="36,0,36,24">
+        <StackPanel Spacing="4" MaxWidth="920">
+            <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" Margin="0,16,0,16" />
+
+            <tk:SettingsCard
+                Header="Start with Windows"
+                Description="Run MonitorToggle in the background when you sign in, so it can react to Xbox mode.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE7E8;" />
+                </tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="StartupSwitch" OnContent="On" OffContent="Off" Toggled="OnStartupToggled" />
+            </tk:SettingsCard>
+
+            <tk:SettingsCard
+                Header="Keep-changes timeout"
+                Description="Seconds to wait for &quot;Keep changes&quot; before display changes made in the app are reverted.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE916;" />
+                </tk:SettingsCard.HeaderIcon>
+                <NumberBox x:Name="TimeoutBox" Minimum="5" Maximum="120" SmallChange="5"
+                           SpinButtonPlacementMode="Inline" MinWidth="140" ValueChanged="OnTimeoutChanged" />
+            </tk:SettingsCard>
+
+            <TextBlock Text="Shortcuts" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="1,24,0,4" />
+
+            <tk:SettingsCard
+                Header="Shortcuts for every profile"
+                Description="Pin a shortcut in the Game Bar LaunchDeck widget to switch profiles with a controller.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE71B;" />
+                </tk:SettingsCard.HeaderIcon>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="On desktop" Click="OnProfileShortcutsDesktop" />
+                    <Button Content="In Start menu" Click="OnProfileShortcutsStartMenu" />
+                </StackPanel>
+            </tk:SettingsCard>
+
+            <tk:SettingsCard
+                Header="&quot;Next profile&quot; shortcut"
+                Description="One shortcut that cycles through your profiles in order, like a single toggle button.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE8EE;" />
+                </tk:SettingsCard.HeaderIcon>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="On desktop" Click="OnNextShortcutDesktop" />
+                    <Button Content="In Start menu" Click="OnNextShortcutStartMenu" />
+                </StackPanel>
+            </tk:SettingsCard>
+
+            <InfoBar x:Name="ResultBar" IsClosable="True" Margin="0,8,0,0" />
+
+            <TextBlock Text="About" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="1,24,0,4" />
+
+            <tk:SettingsCard x:Name="AboutCard" Header="MonitorToggle">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE946;" />
+                </tk:SettingsCard.HeaderIcon>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <HyperlinkButton Content="GitHub" NavigateUri="https://github.com/joshlove007/MonitorToggle" />
+                    <Button Content="Open data folder" Click="OnOpenDataFolder" />
+                </StackPanel>
+            </tk:SettingsCard>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

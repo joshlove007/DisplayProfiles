@@ -13,6 +13,7 @@ namespace MonitorToggle.App;
 public partial class App : Application
 {
     private readonly bool startHidden;
+    private readonly string? initialPage;
     private readonly AppInstance mainInstance;
     private readonly DispatcherQueue ui = DispatcherQueue.GetForCurrentThread();
     private ProfileService? profiles;
@@ -21,13 +22,21 @@ public partial class App : Application
     private MainWindow? window;
     private bool exiting;
 
-    public App(bool startHidden, AppInstance mainInstance)
+    public App(bool startHidden, AppInstance mainInstance, string? initialPage = null)
     {
         this.startHidden = startHidden;
         this.mainInstance = mainInstance;
+        this.initialPage = initialPage;
+        Instance = this;
         InitializeComponent();
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
     }
+
+    internal static App Instance { get; private set; } = null!;
+
+    internal ProfileService Profiles => profiles!;
+
+    internal FullScreenExperienceMonitor? XboxMonitor => xboxMonitor;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -67,7 +76,7 @@ public partial class App : Application
     {
         if (window is null)
         {
-            window = new MainWindow();
+            window = new MainWindow(initialPage);
             window.AppWindow.Closing += (_, e) =>
             {
                 if (!exiting)

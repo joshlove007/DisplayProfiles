@@ -46,10 +46,19 @@ public static class Program
         {
             var queue = DispatcherQueue.GetForCurrentThread();
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(queue));
-            var app = new App(startHidden: args.Contains("--background", StringComparer.OrdinalIgnoreCase), mainInstance);
+            var app = new App(
+                startHidden: args.Contains("--background", StringComparer.OrdinalIgnoreCase),
+                mainInstance,
+                initialPage: ValueAfter(args, "--page"));
             GC.KeepAlive(app);
         });
         return 0;
+    }
+
+    private static string? ValueAfter(string[] args, string flag)
+    {
+        int index = Array.FindIndex(args, a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+        return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
     }
 
     private static unsafe int RunCommandLine(string[] args)
