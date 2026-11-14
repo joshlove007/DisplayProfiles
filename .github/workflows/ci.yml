@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build DisplayProfiles.slnx --nologo -v:minimal
+
+      - name: Test
+        run: dotnet test --solution DisplayProfiles.slnx --nologo --no-build
+
+      - name: Publish app (smoke test)
+        run: dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r win-x64 --nologo -v:minimal -o publish
+
+      - name: Published app has its compiled XAML
+        shell: pwsh
+        run: |
+          if (-not (Test-Path publish/DisplayProfiles.pri)) { throw 'DisplayProfiles.pri is missing from the publish output.' }
+
+  widget:
+    name: Build Game Bar widget
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build widget package
+        shell: pwsh
+        run: ./tools/Build-Widget.ps1

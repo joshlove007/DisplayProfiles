@@ -24,9 +24,15 @@ if ($Uninstall) {
 }
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$msix = Get-ChildItem (Join-Path $repoRoot 'artifacts\widget') -Filter '*.msix' -Recurse |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $msix) { throw 'No .msix found in artifacts\widget. Run tools\Build-Widget.ps1 first.' }
+
+# From a release download the package sits next to this script; from a source checkout it is in artifacts\widget.
+$searchRoots = @($PSScriptRoot, (Join-Path $repoRoot 'artifacts\widget')) | Where-Object { Test-Path $_ }
+$msix = foreach ($root in $searchRoots) {
+    $found = Get-ChildItem $root -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($found) { $found; break }
+}
+if (-not $msix) { throw 'No .msix found next to this script or in artifacts\widget. Run tools\Build-Widget.ps1 first.' }
 $cer = Get-ChildItem $msix.Directory.FullName -Filter '*.cer' | Select-Object -First 1
 if (-not $cer) { throw "No .cer next to $($msix.Name)." }
 
