@@ -47,7 +47,8 @@ jobs:
           choco install innosetup -y --no-progress | Out-Null
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           foreach ($rid in 'win-x64', 'win-arm64') {
-            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid `
+            $platform = if ($rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
+            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid "-p:Platform=$platform" `
               -p:Version=${{ steps.version.outputs.full }} --nologo -v:minimal -o "publish/$rid"
             if ($LASTEXITCODE -ne 0) { throw "publish failed for $rid" }
             if (-not (Test-Path "publish/$rid/DisplayProfiles.pri")) { throw "DisplayProfiles.pri missing for $rid" }
