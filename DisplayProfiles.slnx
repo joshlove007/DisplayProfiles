@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DisplayProfiles.Core/DisplayProfiles.Core.csproj" />
+    <Project Path="src/DisplayProfiles.App/DisplayProfiles.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DisplayProfiles.Tests/DisplayProfiles.Tests.csproj" />
+  </Folder>
+</Solution>

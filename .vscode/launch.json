@@ -2,11 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "MonitorToggle (App)",
+      "name": "DisplayProfiles (App)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/artifacts/bin/MonitorToggle.App/debug/MonitorToggle.exe",
+      "program": "${workspaceFolder}/artifacts/bin/DisplayProfiles.App/debug/DisplayProfiles.exe",
       "cwd": "${workspaceFolder}",
       "console": "internalConsole"
     }

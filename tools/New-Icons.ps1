@@ -1,6 +1,6 @@
 # Generates the app and tray icons from the Segoe Fluent Icons "TVMonitor" glyph (U+E7F4).
-# Output: src/MonitorToggle.App/Assets/{MonitorToggle,tray-light,tray-dark}.ico
-param([string]$OutDir = (Join-Path $PSScriptRoot '..\src\MonitorToggle.App\Assets'))
+# Output: src/DisplayProfiles.App/Assets/{DisplayProfiles,tray-light,tray-dark}.ico
+param([string]$OutDir = (Join-Path $PSScriptRoot '..\src\DisplayProfiles.App\Assets'))
 
 Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -53,13 +53,13 @@ function Save-Ico([string]$path, [int[]]$sizes, [System.Drawing.Color]$foregroun
 
 $accent = [System.Drawing.Color]::FromArgb(255, 0, 120, 212)
 $clear = [System.Drawing.Color]::FromArgb(0, 0, 0, 0)
-Save-Ico (Join-Path $OutDir 'MonitorToggle.ico') @(16, 24, 32, 48, 64, 128, 256) ([System.Drawing.Color]::White) $accent 0.62
+Save-Ico (Join-Path $OutDir 'DisplayProfiles.ico') @(16, 24, 32, 48, 64, 128, 256) ([System.Drawing.Color]::White) $accent 0.62
 Save-Ico (Join-Path $OutDir 'tray-light.ico') @(16, 20, 24, 32, 48) ([System.Drawing.Color]::FromArgb(255, 26, 26, 26)) $clear 0.95
 Save-Ico (Join-Path $OutDir 'tray-dark.ico') @(16, 20, 24, 32, 48) ([System.Drawing.Color]::White) $clear 0.95
 Write-Host "Icons written to $OutDir"
 
 # Game Bar widget package assets.
-$WidgetDir = Join-Path $PSScriptRoot '..\src\MonitorToggle.Widget\Assets'
+$WidgetDir = Join-Path $PSScriptRoot '..\src\DisplayProfiles.Widget\Assets'
 New-Item -ItemType Directory -Force $WidgetDir | Out-Null
 [System.IO.File]::WriteAllBytes((Join-Path $WidgetDir 'Square44x44Logo.png'), (New-GlyphPng 44 ([System.Drawing.Color]::White) $accent 0.62))
 [System.IO.File]::WriteAllBytes((Join-Path $WidgetDir 'Square150x150Logo.png'), (New-GlyphPng 150 ([System.Drawing.Color]::White) $accent 0.62))

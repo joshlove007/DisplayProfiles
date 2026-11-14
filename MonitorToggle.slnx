@@ -1,9 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/MonitorToggle.Core/MonitorToggle.Core.csproj" />
-    <Project Path="src/MonitorToggle.App/MonitorToggle.App.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/MonitorToggle.Tests/MonitorToggle.Tests.csproj" />
-  </Folder>
-</Solution>

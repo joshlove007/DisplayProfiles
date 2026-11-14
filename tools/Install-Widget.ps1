@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Installs the MonitorToggle Game Bar widget built by Build-Widget.ps1.
+    Installs the DisplayProfiles Game Bar widget built by Build-Widget.ps1.
 
 .DESCRIPTION
     Trusts the package's self-signed certificate (this needs administrator rights, so the script asks for them once)
@@ -12,7 +12,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$packageName = 'MonitorToggle.GameBarWidget'
+$packageName = 'DisplayProfiles.GameBarWidget'
+
+# The widget used to be called MonitorToggle.
+Get-AppxPackage 'MonitorToggle.GameBarWidget' | Remove-AppxPackage -ErrorAction SilentlyContinue
 
 if ($Uninstall) {
     Get-AppxPackage $packageName | Remove-AppxPackage
@@ -54,4 +57,4 @@ else {
 }
 
 Write-Host "Installed $($msix.Name)." -ForegroundColor Green
-Write-Host 'Open Game Bar (Win + G), open the widget menu and add MonitorToggle. Sign out and in if it does not show up.'
+Write-Host 'Open Game Bar (Win + G), open the widget menu and add DisplayProfiles. Sign out and in if it does not show up.'

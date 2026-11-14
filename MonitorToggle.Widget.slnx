@@ -1,6 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/MonitorToggle.Widget/MonitorToggle.Widget.csproj" />
-    <Project Path="src/MonitorToggle.Widget.GameBarProjection/MonitorToggle.Widget.GameBarProjection.csproj" />
-  </Folder>
-</Solution>

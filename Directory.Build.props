@@ -15,6 +15,6 @@
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <UseArtifactsOutput>true</UseArtifactsOutput>
     <Authors>Josh Lovelace</Authors>
-    <Product>MonitorToggle</Product>
+    <Product>DisplayProfiles</Product>
   </PropertyGroup>
 </Project>

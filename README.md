@@ -1,4 +1,4 @@
-# MonitorToggle
+# DisplayProfiles
 
 Profile-based display switcher for Windows 11, written in C# on .NET 11.
 
@@ -15,7 +15,7 @@ Windows.
   resolution, refresh rate and orientation. Edits save automatically.
 - **Safe applying**: the app verifies that every monitor really came up (retrying if a TV is slow to wake), restores your
   previous layout if Windows rejects the change, and shows a "Keep these display settings?" prompt when you apply from the app.
-- **Tray icon** with a profile menu, **command line** and **shortcuts** (`MonitorToggle.exe apply "TV"`, `toggle`, `next`).
+- **Tray icon** with a profile menu, **command line** and **shortcuts** (`DisplayProfiles.exe apply "TV"`, `toggle`, `next`).
 - **Xbox mode**: pick a profile to apply when Xbox mode starts (and optionally when it ends). Detection uses Windows'
   gaming-experience API.
 - **Game Bar widget**: pick a profile with a controller from Xbox Game Bar.
@@ -26,9 +26,9 @@ Windows.
 Requires the [.NET 11 SDK](https://dotnet.microsoft.com/download) on Windows 11.
 
 ```powershell
-dotnet build MonitorToggle.slnx
-dotnet test --solution MonitorToggle.slnx
-dotnet run --project src/MonitorToggle.App
+dotnet build DisplayProfiles.slnx
+dotnet test --solution DisplayProfiles.slnx
+dotnet run --project src/DisplayProfiles.App
 ```
 
 Everything above is SDK-style and works with VS Code (C# Dev Kit). `.vscode/tasks.json` has build, test and publish tasks.
@@ -36,16 +36,16 @@ Everything above is SDK-style and works with VS Code (C# Dev Kit). `.vscode/task
 ### Command line
 
 ```text
-MonitorToggle.exe apply <profile>   switch to a profile (name, unique prefix, or id)
-MonitorToggle.exe toggle | next     switch to the next profile in the list
-MonitorToggle.exe list | current    show profiles / the active one
-MonitorToggle.exe capture <name>    save the current layout as a profile
-MonitorToggle.exe --background      start only the tray icon
-MonitorToggle.exe --page xbox       open the app on a page (profiles, xbox, settings)
+DisplayProfiles.exe apply <profile>   switch to a profile (name, unique prefix, or id)
+DisplayProfiles.exe toggle | next     switch to the next profile in the list
+DisplayProfiles.exe list | current    show profiles / the active one
+DisplayProfiles.exe capture <name>    save the current layout as a profile
+DisplayProfiles.exe --background      start only the tray icon
+DisplayProfiles.exe --page xbox       open the app on a page (profiles, xbox, settings)
 ```
 
 Settings > Shortcuts creates a shortcut per profile on the desktop or in the Start menu. Pin one in the Game Bar
-"LaunchDeck" widget if you prefer that to the MonitorToggle widget.
+"LaunchDeck" widget if you prefer that to the DisplayProfiles widget.
 
 ### Xbox Game Bar widget
 
@@ -58,9 +58,9 @@ tools** workload.
 .\tools\Install-Widget.ps1    # trusts the certificate (asks for admin once) and installs the package
 ```
 
-Then open Game Bar (Win + G), open the widget menu and add **MonitorToggle**. The widget is sandboxed, so it never touches the
-displays itself: the app publishes the profile list into the widget's data folder and registers a `monitortoggle:` link
-(`monitortoggle:apply/<id>`, `monitortoggle:next`) that the widget launches to ask the app to switch.
+Then open Game Bar (Win + G), open the widget menu and add **DisplayProfiles**. The widget is sandboxed, so it never touches the
+displays itself: the app publishes the profile list into the widget's data folder and registers a `displayprofiles:` link
+(`displayprofiles:apply/<id>`, `displayprofiles:next`) that the widget launches to ask the app to switch.
 
 ### Xbox mode
 
@@ -71,10 +71,10 @@ Xbox mode page.
 
 | Path | Purpose |
 |---|---|
-| `src/MonitorToggle.Core` | Display engine, profiles, CLI, Xbox mode detection, shortcuts, widget bridge |
-| `src/MonitorToggle.App` | WinUI 3 app: editor, tray icon, single-instance host |
-| `src/MonitorToggle.Widget*` | Game Bar widget and its Game Bar SDK projection (`MonitorToggle.Widget.slnx`) |
-| `tests/MonitorToggle.Tests` | xUnit tests |
+| `src/DisplayProfiles.Core` | Display engine, profiles, CLI, Xbox mode detection, shortcuts, widget bridge |
+| `src/DisplayProfiles.App` | WinUI 3 app: editor, tray icon, single-instance host |
+| `src/DisplayProfiles.Widget*` | Game Bar widget and its Game Bar SDK projection (`DisplayProfiles.Widget.slnx`) |
+| `tests/DisplayProfiles.Tests` | xUnit tests |
 | `tools/` | Icon generator and widget build/install scripts |
 
 ## License

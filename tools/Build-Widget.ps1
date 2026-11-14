@@ -20,8 +20,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$project = Join-Path $repoRoot 'src\MonitorToggle.Widget\MonitorToggle.Widget.csproj'
-$manifest = Join-Path $repoRoot 'src\MonitorToggle.Widget\Package.appxmanifest'
+$project = Join-Path $repoRoot 'src\DisplayProfiles.Widget\DisplayProfiles.Widget.csproj'
+$manifest = Join-Path $repoRoot 'src\DisplayProfiles.Widget\Package.appxmanifest'
 $outDir = Join-Path $repoRoot 'artifacts\widget'
 
 $publisher = ([xml](Get-Content $manifest)).Package.Identity.Publisher
@@ -40,7 +40,7 @@ $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
 if (-not $cert) {
     Write-Host "Creating a self-signed certificate for '$publisher'..." -ForegroundColor Yellow
     $cert = New-SelfSignedCertificate -Type Custom -Subject $publisher `
-        -KeyUsage DigitalSignature -FriendlyName 'MonitorToggle widget sideload signing' `
+        -KeyUsage DigitalSignature -FriendlyName 'DisplayProfiles widget sideload signing' `
         -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5) `
         -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
 }
