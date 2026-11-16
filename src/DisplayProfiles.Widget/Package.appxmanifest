@@ -8,10 +8,10 @@
   <Identity
     Name="DisplayProfiles.GameBarWidget"
     Publisher="CN=DisplayProfiles"
-    Version="1.0.1.0" />
+    Version="1.0.2.0" />
 
   <Properties>
-    <DisplayName>Display Profiles</DisplayName>
+    <DisplayName>Display Profiles for Xbox Game Bar</DisplayName>
     <PublisherDisplayName>Display Profiles</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -30,8 +30,11 @@
     <Application Id="App"
                  Executable="$targetnametoken$.exe"
                  EntryPoint="DisplayProfiles.Widget.App">
+      <!-- AppListEntry="none": the widget is only opened from Game Bar, so it stays out of the Start menu and the app list,
+           leaving a single "Display Profiles" there (the main app). -->
       <uap:VisualElements
-        DisplayName="Display Profiles"
+        DisplayName="Display Profiles for Xbox Game Bar"
+        AppListEntry="none"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         Description="Switch display profiles from Xbox Game Bar"

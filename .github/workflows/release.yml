@@ -41,29 +41,6 @@ jobs:
       - name: Test
         run: dotnet test --solution DisplayProfiles.slnx --nologo
 
-      - name: Publish app and build installers
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress | Out-Null
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          foreach ($rid in 'win-x64', 'win-arm64') {
-            $platform = if ($rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
-            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid "-p:Platform=$platform" `
-              -p:Version=${{ steps.version.outputs.full }} --nologo -v:minimal -o "publish/$rid"
-            if ($LASTEXITCODE -ne 0) { throw "publish failed for $rid" }
-            if (-not (Test-Path "publish/$rid/DisplayProfiles.pri")) { throw "DisplayProfiles.pri missing for $rid" }
-
-            # Portable zip
-            Compress-Archive "publish/$rid/*" "DisplayProfiles-${{ steps.version.outputs.full }}-$rid-portable.zip" -CompressionLevel Optimal
-
-            # Installer
-            $arch = $rid.Replace('win-', '')
-            & $iscc /Q "/DAppVersion=${{ steps.version.outputs.full }}" "/DNumericVersion=${{ steps.version.outputs.number }}.0" `
-              "/DArch=$arch" "/DSourceDir=..\publish\$rid" installer/DisplayProfiles.iss
-            if ($LASTEXITCODE -ne 0) { throw "installer build failed for $arch" }
-          }
-          Copy-Item artifacts/installer/*.exe .
-
       - name: Build the Game Bar widget
         shell: pwsh
         env:
@@ -86,6 +63,31 @@ jobs:
           New-Item -ItemType Directory $stage | Out-Null
           Copy-Item $package.FullName, $cer.FullName, tools/Install-Widget.ps1 $stage
           Compress-Archive "$stage/*" "DisplayProfiles-GameBarWidget-${{ steps.version.outputs.full }}.zip" -CompressionLevel Optimal
+
+      - name: Publish app and build installers
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress | Out-Null
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            $platform = if ($rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
+            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid "-p:Platform=$platform" `
+              -p:Version=${{ steps.version.outputs.full }} --nologo -v:minimal -o "publish/$rid"
+            if ($LASTEXITCODE -ne 0) { throw "publish failed for $rid" }
+            if (-not (Test-Path "publish/$rid/DisplayProfiles.pri")) { throw "DisplayProfiles.pri missing for $rid" }
+
+            # Portable zip
+            Compress-Archive "publish/$rid/*" "DisplayProfiles-${{ steps.version.outputs.full }}-$rid-portable.zip" -CompressionLevel Optimal
+
+            # Installer. Only the x64 one carries the Game Bar widget, which is built for x64.
+            $arch = $rid.Replace('win-', '')
+            $isccArgs = @('/Q', "/DAppVersion=${{ steps.version.outputs.full }}", "/DNumericVersion=${{ steps.version.outputs.number }}.0",
+              "/DArch=$arch", "/DSourceDir=..\publish\$rid")
+            if ($arch -eq 'x64') { $isccArgs += '/DWidgetDir=..\widget-stage' }
+            & $iscc @isccArgs installer/DisplayProfiles.iss
+            if ($LASTEXITCODE -ne 0) { throw "installer build failed for $arch" }
+          }
+          Copy-Item artifacts/installer/*.exe .
 
       - name: Create the release
         shell: pwsh

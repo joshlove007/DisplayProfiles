@@ -148,12 +148,6 @@ foreach ($size in 16, 20, 24, 32, 44, 256) {
     [System.IO.File]::WriteAllBytes((Join-Path $GameBarIcons "icon.light.targetsize-$size.png"), (Get-Png $b)); $b.Dispose()
 }
 
-# The header inside the widget picks the glyph that matches the widget theme.
-foreach ($t in @(@('HeaderIcon-dark.png', 64, [System.Drawing.Color]::White), @('HeaderIcon-light.png', 64, $light))) {
-    $b = New-IconBitmap $t[1] 'mono' $t[2] $t[1] $t[1] 0.92
-    [System.IO.File]::WriteAllBytes((Join-Path $WidgetAssets $t[0]), (Get-Png $b)); $b.Dispose()
-}
-
 if ($PreviewDir) {
     New-Item -ItemType Directory -Force $PreviewDir | Out-Null
     foreach ($style in 'color', 'tile') { $b = New-IconBitmap 256 $style; $b.Save((Join-Path $PreviewDir "preview-$style.png")); $b.Dispose() }

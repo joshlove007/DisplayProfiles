@@ -41,6 +41,15 @@
             </tk:SettingsCard>
 
             <tk:SettingsCard
+                Header="Show disconnected displays that are off"
+                Description="Displays saved in a profile that aren't connected and are switched off are hidden. Turn this on to review them or remove them from a profile.">
+                <tk:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xED1A;" />
+                </tk:SettingsCard.HeaderIcon>
+                <ToggleSwitch x:Name="ShowDisconnectedSwitch" OnContent="On" OffContent="Off" Toggled="OnShowDisconnectedToggled" />
+            </tk:SettingsCard>
+
+            <tk:SettingsCard
                 Header="Keep-changes timeout"
                 Description="Seconds to wait for &quot;Keep changes&quot; before display changes made in the app are reverted.">
                 <tk:SettingsCard.HeaderIcon>

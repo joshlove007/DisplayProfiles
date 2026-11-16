@@ -20,6 +20,8 @@ public sealed partial class XboxModePage : Page, IControllerPage
 
     public bool OnPrimaryAction() => false;
 
+    public bool OnSecondaryAction() => false;
+
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         var service = App.Instance.Profiles;

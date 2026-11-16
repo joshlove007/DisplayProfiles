@@ -4,7 +4,6 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using DisplayProfiles.App.ViewModels;
 using DisplayProfiles.Core.Display;
 using Windows.Graphics;
 
@@ -15,13 +14,20 @@ internal static class IdentifyOverlay
 {
     private const int Size = 200;
 
-    public static void Show(IEnumerable<DisplayInfo> displays)
+    /// <param name="numberOf">The number the editor shows for a display, so Identify and the editor always agree.</param>
+    public static void Show(IEnumerable<DisplayInfo> displays, Func<DisplayInfo, int> numberOf)
     {
         foreach (var display in displays.Where(d => d.Attached))
         {
+            int displayNumber = numberOf(display);
+            if (displayNumber <= 0)
+            {
+                continue;
+            }
+
             var number = new TextBlock
             {
-                Text = ProfileEditorViewModel.DisplayNumber(display, 0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Text = displayNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 FontSize = 96,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center,

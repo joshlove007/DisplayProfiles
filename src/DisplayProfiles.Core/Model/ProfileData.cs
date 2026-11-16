@@ -47,6 +47,9 @@ public sealed record AppSettings
 
     public ControllerThemePreference ControllerTheme { get; init; } = ControllerThemePreference.Dark;
 
+    /// <summary>Also list monitors that are saved in a profile, switched off and not connected (hidden by default).</summary>
+    public bool ShowDisconnectedDisplays { get; init; }
+
     /// <summary>Seconds the "keep these settings?" prompt waits before reverting.</summary>
     public int RevertTimeoutSeconds { get; init; } = 15;
 

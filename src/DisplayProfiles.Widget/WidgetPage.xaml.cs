@@ -89,9 +89,6 @@ public sealed partial class WidgetPage : Page
         {
             Root.RequestedTheme = widget.RequestedTheme;
         }
-
-        string icon = Root.ActualTheme == ElementTheme.Light ? "HeaderIcon-light.png" : "HeaderIcon-dark.png";
-        HeaderIcon.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/" + icon));
     }
 
     private void Refresh()
