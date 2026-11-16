@@ -122,6 +122,9 @@ internal sealed class GamepadNavigator
             case GamepadAction.Primary when !overlay.IsOpen:
                 window.CurrentPage?.OnPrimaryAction();
                 break;
+            case GamepadAction.Secondary when !overlay.IsOpen:
+                window.CurrentPage?.OnSecondaryAction();
+                break;
             case GamepadAction.ScrollUp:
                 Scroll(focused, -ScrollStep);
                 break;

@@ -246,6 +246,7 @@ public sealed partial class MainWindow : Window
             VirtualKey.Right when !typing || caretAtEnd => GamepadAction.Right,
             VirtualKey.Enter or VirtualKey.Space when !typing => GamepadAction.Accept,
             VirtualKey.Y when !typing => GamepadAction.Primary,
+            VirtualKey.X when !typing => GamepadAction.Secondary,
             _ => null,
         };
 

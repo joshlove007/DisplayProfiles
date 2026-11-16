@@ -24,19 +24,12 @@
 
     <Grid x:Name="Root" Padding="16" RowSpacing="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,0">
-            <Image x:Name="HeaderIcon" Width="24" Height="24" VerticalAlignment="Center" />
-            <TextBlock Text="Display profiles" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </StackPanel>
-
         <ListView
             x:Name="ProfileList"
-            Grid.Row="1"
             SelectionMode="None"
             IsItemClickEnabled="True"
             ItemClick="OnProfileClick"
@@ -76,12 +69,12 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <StackPanel x:Name="EmptyPanel" Grid.Row="1" Spacing="12" VerticalAlignment="Center" Visibility="Collapsed">
+        <StackPanel x:Name="EmptyPanel" Spacing="12" VerticalAlignment="Center" Visibility="Collapsed">
             <TextBlock x:Name="EmptyText" TextWrapping="Wrap" Foreground="{ThemeResource SecondaryText}" />
             <Button Content="Open Display Profiles" Click="OnOpenAppClick" />
         </StackPanel>
 
-        <TextBlock x:Name="StatusText" Grid.Row="2" Margin="4,0,0,0" TextWrapping="Wrap"
+        <TextBlock x:Name="StatusText" Grid.Row="1" Margin="4,0,0,0" TextWrapping="Wrap"
                    Foreground="{ThemeResource SecondaryText}" Visibility="Collapsed" />
     </Grid>
 </Page>

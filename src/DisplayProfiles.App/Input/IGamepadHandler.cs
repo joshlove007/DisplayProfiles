@@ -16,4 +16,7 @@ internal interface IControllerPage
 
     /// <summary>Y was pressed; returns true if the page handled it.</summary>
     bool OnPrimaryAction();
+
+    /// <summary>X was pressed; returns true if the page handled it.</summary>
+    bool OnSecondaryAction();
 }

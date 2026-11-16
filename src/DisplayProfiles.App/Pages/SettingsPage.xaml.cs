@@ -35,12 +35,15 @@ public sealed partial class SettingsPage : Page, IControllerPage
 
     public bool OnPrimaryAction() => false;
 
+    public bool OnSecondaryAction() => false;
+
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         var service = App.Instance.Profiles;
         service.Reload();
         loading = true;
         StartupSwitch.IsOn = StartupRegistration.IsEnabled();
+        ShowDisconnectedSwitch.IsOn = service.Data.Settings.ShowDisconnectedDisplays;
 
         int saved = service.Data.Settings.RevertTimeoutSeconds;
         timeouts = [.. TimeoutChoices];
@@ -104,6 +107,17 @@ public sealed partial class SettingsPage : Page, IControllerPage
 
         StartupRegistration.SetEnabled(StartupSwitch.IsOn, Environment.ProcessPath!);
         App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { StartWithWindows = StartupSwitch.IsOn } });
+    }
+
+    private void OnShowDisconnectedToggled(object sender, RoutedEventArgs e)
+    {
+        if (loading)
+        {
+            return;
+        }
+
+        bool show = ShowDisconnectedSwitch.IsOn;
+        App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { ShowDisconnectedDisplays = show } });
     }
 
     private void OnTimeoutChanged(object? sender, EventArgs e)

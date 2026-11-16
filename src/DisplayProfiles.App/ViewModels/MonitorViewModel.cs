@@ -49,9 +49,15 @@ public sealed partial class MonitorViewModel : ObservableObject
 
     public string Name { get; }
 
-    public int Number { get; }
+    /// <summary>Position in the editor's list (1, 2, 3 ...). Only for display; monitors are matched by <see cref="Key"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Title))]
+    public partial int Number { get; set; }
 
     public bool IsConnected { get; }
+
+    /// <summary>Only a display that isn't connected can be removed from the profile.</summary>
+    public bool CanRemove => !IsConnected;
 
     public IReadOnlyList<string> ResolutionLabels { get; }
 
