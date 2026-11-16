@@ -7,10 +7,9 @@
     xmlns:vm="using:DisplayProfiles.App.ViewModels"
     xmlns:tk="using:CommunityToolkit.WinUI.Controls">
 
-    <!-- Capped at the natural width of the list plus the editor and centred, so a wide window does not strand the list on the left. -->
-    <Grid MaxWidth="1300">
+    <Grid x:Name="PageRoot" SizeChanged="OnPageSizeChanged">
         <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup>
+            <VisualStateGroup x:Name="LayoutGroup" CurrentStateChanged="OnLayoutStateChanged">
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="0" />
@@ -103,7 +102,7 @@
         </Grid>
 
         <ScrollViewer x:Name="EditorScroll" Grid.Column="1" Grid.RowSpan="2" Padding="24,16,36,24">
-            <StackPanel Spacing="16">
+            <StackPanel x:Name="EditorPanel" Spacing="16">
 
                 <StackPanel Spacing="8" Visibility="{x:Bind app:Ui.Hidden(ViewModel.HasProfile), Mode=OneWay}" Margin="0,48,0,0">
                     <TextBlock Text="No profiles yet" Style="{StaticResource SubtitleTextBlockStyle}" />
