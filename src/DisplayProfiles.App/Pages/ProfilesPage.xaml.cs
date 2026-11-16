@@ -26,6 +26,33 @@ public sealed partial class ProfilesPage : Page, IControllerPage
 
     public ProfileEditorViewModel ViewModel { get; }
 
+    private void OnPageSizeChanged(object sender, SizeChangedEventArgs e) => CenterEditor();
+
+    private void OnLayoutStateChanged(object sender, VisualStateChangedEventArgs e) => CenterEditor();
+
+    // The list stays at the left. In the two-column layout the editor is centred in the whole window rather than in the
+    // space beside the list, but never closer to the list than its normal padding and never wider than ContentWidth.
+    private void CenterEditor()
+    {
+        const double ContentWidth = 920;
+        const double ListEdge = 280;
+        const double PadLeft = 24;
+        const double PadRight = 36;
+
+        double page = PageRoot.ActualWidth;
+        if (Grid.GetColumnSpan(EditorScroll) != 1 || page <= 0)
+        {
+            EditorPanel.Margin = new Thickness(0);
+            return;
+        }
+
+        double minLeft = ListEdge + PadLeft;
+        double width = Math.Max(0, Math.Min(ContentWidth, page - minLeft - PadRight));
+        double left = Math.Max(minLeft, (page - width) / 2);
+        double right = Math.Max(0, page - left - width - PadRight);
+        EditorPanel.Margin = new Thickness(left - minLeft, 0, right, 0);
+    }
+
     public IReadOnlyList<(string Button, string Text)> Hints { get; } = [("A", "Select"), ("B", "Back"), ("Y", "Apply"), ("LB RB", "Sections")];
 
     public bool OnPrimaryAction()
