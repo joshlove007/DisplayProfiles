@@ -557,6 +557,6 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     {
         var profile = service.Data.Profiles.FirstOrDefault(p => p.Id == SelectedProfile?.Id)
             ?? throw new InvalidOperationException("No profile is selected.");
-        return ShortcutService.CreateForProfile(profile, folder, Environment.ProcessPath!);
+        return ShortcutService.CreateForProfile(profile, folder, AppServices.LaunchPath);
     }
 }

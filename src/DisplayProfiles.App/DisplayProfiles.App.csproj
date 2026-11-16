@@ -26,6 +26,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Not App.xaml: a compiled App.xbf in the combined package's root is picked up by the Game Bar widget (a UWP app),
+         which then fails to start. -->
+    <Page Remove="MainApp.xaml" />
+    <ApplicationDefinition Include="MainApp.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DisplayProfiles.Core\DisplayProfiles.Core.csproj" />
   </ItemGroup>
 

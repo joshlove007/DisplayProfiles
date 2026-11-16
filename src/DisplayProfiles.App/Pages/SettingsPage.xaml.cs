@@ -105,7 +105,7 @@ public sealed partial class SettingsPage : Page, IControllerPage
             return;
         }
 
-        StartupRegistration.SetEnabled(StartupSwitch.IsOn, Environment.ProcessPath!);
+        StartupRegistration.SetEnabled(StartupSwitch.IsOn, AppServices.LaunchPath);
         App.Instance.Profiles.Update(d => d with { Settings = d.Settings with { StartWithWindows = StartupSwitch.IsOn } });
     }
 
@@ -151,13 +151,13 @@ public sealed partial class SettingsPage : Page, IControllerPage
 
     private void OnNextShortcutDesktop(object sender, RoutedEventArgs e) => Run(() =>
     {
-        ShortcutService.CreateForNextProfile(ShortcutService.DesktopFolder, Environment.ProcessPath!);
+        ShortcutService.CreateForNextProfile(ShortcutService.DesktopFolder, AppServices.LaunchPath);
         return "Created the \"Next profile\" shortcut on the desktop.";
     });
 
     private void OnNextShortcutStartMenu(object sender, RoutedEventArgs e) => Run(() =>
     {
-        ShortcutService.CreateForNextProfile(ShortcutService.StartMenuFolder, Environment.ProcessPath!);
+        ShortcutService.CreateForNextProfile(ShortcutService.StartMenuFolder, AppServices.LaunchPath);
         return "Created the \"Next profile\" shortcut in the Start menu.";
     });
 
@@ -166,7 +166,7 @@ public sealed partial class SettingsPage : Page, IControllerPage
         var profiles = App.Instance.Profiles.Data.Profiles;
         foreach (var profile in profiles)
         {
-            ShortcutService.CreateForProfile(profile, folder, Environment.ProcessPath!);
+            ShortcutService.CreateForProfile(profile, folder, AppServices.LaunchPath);
         }
 
         return $"Created {profiles.Count} shortcut{(profiles.Count == 1 ? string.Empty : "s")} in {where}.";
