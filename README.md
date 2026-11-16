@@ -31,7 +31,8 @@ a TV for gaming, and an Xbox controller.
 ## Features
 
 - **Profile editor** with a draggable, snapping monitor map like Settings > Display, per-display on/off, main display,
-  resolution, refresh rate and orientation. Edits save automatically.
+  resolution, refresh rate and orientation. Edits stay in the editor until you press **Save**, so you can try a layout
+  with **Apply** before deciding to keep it.
 - **Safe applying.** The app checks that every monitor really came up (retrying if a TV is slow to wake), restores your
   previous layout if Windows rejects the change, and shows a "Keep these display settings?" prompt when you apply from the app.
 - **Switch from anywhere:** the tray icon, the command line, desktop and Start menu shortcuts, or the Xbox Game Bar widget.
@@ -52,10 +53,10 @@ Download the latest build from the [Releases](https://github.com/joshlove007/Dis
 
 | File | What it is |
 |---|---|
-| `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed. |
+| `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed for the app. It can also install the Xbox Game Bar widget (see below). |
 | `DisplayProfiles-Setup-<version>-arm64.exe` | Installer for Windows on ARM. |
 | `DisplayProfiles-<version>-win-x64-portable.zip` and `...-win-arm64-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
-| `DisplayProfiles-GameBarWidget-<version>.zip` | The optional Xbox Game Bar widget (see below). |
+| `DisplayProfiles-GameBarWidget-<version>.zip` | The Xbox Game Bar widget on its own, for the portable zips and the arm64 build. |
 
 > [!NOTE]
 > The builds are **not code-signed yet**, so Windows SmartScreen may show "Windows protected your PC" the first time you run
@@ -66,16 +67,23 @@ Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is i
 
 ### Xbox Game Bar widget
 
-The widget lists your profiles inside Game Bar (Win + G) so you can switch with a controller. Game Bar widgets have to be
-installed as a package, and the package is signed with a self-signed certificate, so the installer script needs to trust it
-once (it asks for administrator rights for that).
+<p align="center">
+  <img src="docs/images/gamebar-widget.png" alt="The Display Profiles widget in Xbox Game Bar" width="45%" />
+</p>
 
-1. Unzip `DisplayProfiles-GameBarWidget-<version>.zip`.
-2. Run `powershell -ExecutionPolicy Bypass -File .\Install-Widget.ps1` in that folder.
-3. Open Game Bar, open the widget menu and add **Display Profiles**.
+The widget lists your profiles inside Game Bar (Win + G) so you can switch with a controller. The active profile is
+marked, and the widget confirms when a switch has finished (or shows what went wrong).
 
-Display Profiles has to be running in the background (turn on **Start with Windows** in Settings). To remove the widget, run
-the script again with `-Uninstall`.
+Game Bar widgets have to be installed as a package, and the package is signed with a self-signed certificate, so it has to
+be trusted once. That needs administrator rights, which is why the app itself doesn't ask for them.
+
+- **With the x64 installer,** leave **Install the Xbox Game Bar widget** ticked. It asks for administrator permission once.
+- **Otherwise,** unzip `DisplayProfiles-GameBarWidget-<version>.zip` and run
+  `powershell -ExecutionPolicy Bypass -File .\Install-Widget.ps1` in that folder.
+
+Then open Game Bar, open the widget menu and add **Display Profiles for Xbox Game Bar**. Display Profiles has to be running
+in the background (turn on **Start with Windows** in Settings). The uninstaller removes the widget; to remove it by hand,
+run the script again with `-Uninstall`.
 
 ## Using it
 
@@ -119,6 +127,7 @@ what each button does at that moment.
 | D-pad / left stick | Move focus |
 | A | Select, toggle, expand, open a list |
 | B | Back (closes a list, leaves the page, then hides the app) |
+| X | Save the selected profile |
 | Y | Apply the selected profile |
 | LB / RB | Previous / next section |
 | Right stick | Scroll |
@@ -131,7 +140,7 @@ positions that touch another display), then press **A** to drop it or **B** to c
   <img src="docs/images/controller-picker.png" alt="A pick-list in controller mode" width="60%" />
 </p>
 
-The same actions work from a keyboard: arrow keys, Enter or Space, Esc, PageUp and PageDown, and Y.
+The same actions work from a keyboard: arrow keys, Enter or Space, Esc, PageUp and PageDown, X (save) and Y (apply).
 
 ## Settings
 
@@ -143,6 +152,8 @@ The same actions work from a keyboard: arrow keys, Enter or Space, Esc, PageUp a
 - **Controller layout.** Automatic (in Xbox mode), Always on or Always off.
 - **Keep-changes timeout.** How long the "Keep these display settings?" prompt waits before reverting.
 - **Start with Windows.** Run in the background when you sign in.
+- **Show disconnected displays that are off.** Displays saved in a profile that aren't connected and are switched off (for
+  example leftovers from Remote Desktop) are hidden by default. Turn this on to review them or remove them from a profile.
 
 Command line flags for testing: `--xbox` forces the controller layout, `--desktop` forces the normal one, and `--windowed`
 shows the controller layout in a normal window.
