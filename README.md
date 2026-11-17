@@ -63,11 +63,17 @@ Download the package for your PC from the [Releases](https://github.com/joshlove
 | `DisplayProfiles-<version>-x64.msix` | Intel and AMD PCs |
 | `DisplayProfiles-<version>-arm64.msix` | Windows on ARM PCs (Snapdragon and similar) |
 
-Double-click the file and choose **Install**. That's all: the package is signed with a Microsoft-trusted certificate, it
-needs no administrator rights and no certificate to import, and it includes the Xbox Game Bar widget, so there is nothing
-else to set up. Updates install over the old version the same way, and **Settings > Apps** removes it, widget included.
+Double-click the file and choose **Install**.
 
-Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is included. Display Profiles starts with Windows
+<p align="center">
+  <img src="docs/images/install.png" alt="The Windows install dialog for Display Profiles, published by Joshua Lovelace" width="60%" />
+</p>
+
+That's all. The package is signed with a Microsoft-trusted certificate (the publisher shows as Joshua Lovelace), so it needs no
+administrator rights and no certificate to import. It includes the Xbox Game Bar widget, so there is nothing else to set up.
+Updates install over the old version the same way, and **Settings > Apps** removes it, widget included.
+
+Requires Windows 11, or Windows 10 version 2004 or later. The .NET runtime is included. Display Profiles starts with Windows
 by default so it can react to Xbox mode; turn that off in Settings or in **Task Manager > Startup apps**.
 
 > [!NOTE]
@@ -85,6 +91,7 @@ The widget lists your profiles inside Game Bar (Win + G) so you can switch with 
 marked, and the widget confirms when a switch has finished (or shows what went wrong). It comes with the package: open
 Game Bar, open the widget menu and add **Display Profiles for Xbox Game Bar**. Display Profiles has to be running in the
 background, which is the case when **Start with Windows** is on.
+
 ## Using it
 
 1. Open Display Profiles. On first run it creates a profile from your current layout. (If it finds the original
@@ -174,17 +181,25 @@ dotnet test --solution DisplayProfiles.slnx
 dotnet run --project src/DisplayProfiles.App
 ```
 
-Everything is SDK-style and works with VS Code (C# Dev Kit); `.vscode/tasks.json` has build, test and publish tasks. The
-Game Bar widget is the one project `dotnet build` can't build, because Game Bar needs a UWP XAML app and that compiler ships
-with Visual Studio. With the Visual Studio Build Tools (Universal Windows Platform workload) and the Windows SDK installed,
-this builds the same package the releases contain (signed with a self-signed certificate it creates) and installs it:
+Everything is SDK-style and works with VS Code (C# Dev Kit); `.vscode/tasks.json` has build, test and publish tasks. Running
+the app this way is fine for most work, but it runs without package identity, so the Game Bar widget isn't part of it.
+
+The Game Bar widget is the one project `dotnet build` can't build, because Game Bar needs a UWP XAML app and that compiler
+ships with Visual Studio. To build the MSIX that the releases contain (app and widget together) you need the Visual Studio
+Build Tools with the Universal Windows Platform workload, plus the Windows SDK. Run these from the repository root:
 
 ```powershell
-.\tools\Build-Package.ps1                                   # builds artifacts\package\DisplayProfiles_<version>_x64.msix
-.\tools\Install-Widget.ps1 -Package <that .msix>            # trusts the certificate (asks for admin once) and installs it
+.\tools\Build-Package.ps1                          # artifacts\package\DisplayProfiles_<version>_x64.msix, self-signed
+.\tools\Install-Widget.ps1 -Package <that .msix>   # trusts the self-signed certificate (asks for admin once) and installs it
 ```
 
-`.\tools\Build-Widget.ps1` builds just the widget on its own, for working on it.
+Add `-Platform ARM64` to `Build-Package.ps1` for an ARM64 package. `.\tools\Build-Widget.ps1` builds just the widget, for
+working on it.
+
+Releases and Microsoft Store submissions are built by GitHub Actions rather than by hand: pushing a `v*` tag runs the
+[release workflow](.github/workflows/release.yml), which signs the packages with Azure Artifact Signing and also builds the
+unsigned Store bundle. See [How it works](docs/how-it-works.md#releases) for the details.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -193,8 +208,8 @@ this builds the same package the releases contain (signed with a self-signed cer
 | `src/DisplayProfiles.App` | WinUI 3 app: editor, tray icon, controller mode |
 | `src/DisplayProfiles.Widget*` | Game Bar widget and its Game Bar SDK projection |
 | `tests/DisplayProfiles.Tests` | xUnit tests |
-| `tools/` | Icon generator and the widget and package build and install scripts |
-| `docs/` | Documentation and screenshots |
+| `tools/` | Icon generator and the widget, package and Store bundle build and install scripts |
+| `docs/` | Documentation, screenshots, and the Microsoft Store listing (`docs/store`) |
 
 ## Privacy
 

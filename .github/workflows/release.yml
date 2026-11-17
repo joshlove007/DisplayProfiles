@@ -17,7 +17,27 @@ permissions:
   id-token: write
 
 jobs:
+  # Re-running the workflow for a tag that already has a release (for example to get a fresh Store bundle) must not try to
+  # create the release again, so the release job only runs when there isn't one.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release-exists: ${{ steps.release.outputs.exists }}
+    steps:
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.release-exists != 'true'
     runs-on: windows-latest
     # Matches the Azure federated credential's subject (...:environment:release), which is what lets this job sign in.
     environment: release

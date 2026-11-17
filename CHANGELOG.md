@@ -8,6 +8,7 @@ project uses [semantic versioning](https://semver.org/).
 ### Changed
 
 - The release workflow also builds the unsigned Microsoft Store bundle and keeps it as a run artifact, so it no longer has to be built by hand.
+  Running the workflow again for a tag that already has a release now builds only the Store bundle instead of failing.
 
 ## [0.1.0-beta.6]
 
