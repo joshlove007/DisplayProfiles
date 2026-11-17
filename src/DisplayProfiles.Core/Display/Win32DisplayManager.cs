@@ -65,11 +65,16 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             adapter = NewDisplayDevice();
         }
 
-        return DisambiguateKeys(MarkMirrored(CollapseDuplicateOutputs(found)));
+        return DisambiguateKeys(AddHidden(MarkMirrored(CollapseDuplicateOutputs(found))));
     }
 
     public IReadOnlyList<DisplayMode> GetModes(string adapterName)
     {
+        if (adapterName.Length == 0)
+        {
+            return [];
+        }
+
         var modes = new HashSet<DisplayMode>();
         var dm = NewDevMode();
         for (int i = 0; PInvoke.EnumDisplaySettings(adapterName, (ENUM_DISPLAY_SETTINGS_MODE)i, ref dm); i++)
@@ -379,6 +384,34 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
                     found.Add((member.DevicePath, mirrored));
                 }
             }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// In some states Windows leaves a connected monitor that isn't on the desktop out of the adapter list. The display
+    /// configuration still knows it, so it is listed here without an adapter (an empty <see cref="DisplayInfo.AdapterName"/>)
+    /// and can't be placed until the desktop has been extended again.
+    /// </summary>
+    private static List<(string DevicePath, DisplayInfo Info)> AddHidden(List<(string DevicePath, DisplayInfo Info)> found)
+    {
+        foreach (var path in QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS).Paths)
+        {
+            if (!(bool)path.targetInfo.targetAvailable ||
+                !TryGetTargetName(path.targetInfo.adapterId, path.targetInfo.id, out string devicePath, out string name) ||
+                found.Any(f => string.Equals(f.DevicePath, devicePath, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            string hardwareId = ExtractHardwareId(devicePath);
+            found.Add((devicePath, new DisplayInfo
+            {
+                AdapterName = string.Empty,
+                Key = hardwareId,
+                FriendlyName = string.IsNullOrWhiteSpace(name) ? hardwareId : name,
+            }));
         }
 
         return found;

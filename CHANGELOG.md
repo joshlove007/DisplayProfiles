@@ -5,6 +5,14 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta.5]
+
+### Fixed
+
+- Windows sometimes leaves a connected monitor that isn't on the desktop out of its display list (for example after duplicating
+  displays). Display Profiles then said it wasn't connected and skipped it. It now sees these monitors through the display
+  configuration and extends the desktop first when a profile needs one.
+
 ## [0.1.0-beta.4]
 
 ### Added
@@ -56,7 +64,8 @@ First public beta.
 - Responsive layout that adapts to narrow windows.
 - Installers for x64 and arm64 (per user), portable zips and the Game Bar widget package.
 
-[Unreleased]: https://github.com/joshlove007/DisplayProfiles/compare/v0.1.0-beta.4...HEAD
+[Unreleased]: https://github.com/joshlove007/DisplayProfiles/compare/v0.1.0-beta.5...HEAD
+[0.1.0-beta.5]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.5
 [0.1.0-beta.4]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.4
 [0.1.0-beta.3]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.3
 [0.1.0-beta.1]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.1

@@ -172,21 +172,32 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
     private ApplyPlan PlanFresh(IReadOnlyList<MonitorConfig> layout)
     {
         var current = Displays.GetDisplays();
-        var plan = ApplyPlanner.Plan(layout, current);
 
-        // Mirrored monitors can also drop out of Windows' list altogether, so a layout that mirrors something and names a
-        // monitor that isn't listed needs the desktop extended again first.
+        // Windows can leave a connected monitor out of its list (no adapter), and a monitor that mirrors another can drop
+        // out too. Both come back when the desktop is extended again, which has to happen before the layout is planned.
+        bool hidden = layout.Any(c => c.Enabled && current.Any(d => d.Key == c.Key && d.AdapterName.Length == 0));
         bool missingForMirror = layout.Any(c => c.Enabled && c.IsDuplicate) &&
             layout.Any(c => c.Enabled && current.All(d => d.Key != c.Key));
-        if (missingForMirror || current.Any(d => d.DuplicateOf is not null))
+        bool needsExtend = hidden || missingForMirror || current.Any(d => d.DuplicateOf is not null);
+
+        ApplyPlan? plan = null;
+        try
+        {
+            plan = ApplyPlanner.Plan(layout, current);
+        }
+        catch (DisplayApplyException) when (needsExtend)
+        {
+            // Planned again below, once every monitor is listed.
+        }
+
+        if (needsExtend)
         {
             Displays.BreakDuplicates();
             plan = ApplyPlanner.Plan(layout, Displays.GetDisplays());
         }
 
-        return plan;
+        return plan!;
     }
-
     /// <summary>How long to let Windows settle before checking that the monitors really came up.</summary>
     public TimeSpan SettleDelay { get; init; } = TimeSpan.FromMilliseconds(1500);
 
