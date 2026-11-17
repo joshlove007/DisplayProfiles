@@ -10,14 +10,20 @@ namespace DisplayProfiles.Core.Display;
 /// Enumerates and reconfigures monitors through ChangeDisplaySettingsEx (the same mechanism the original
 /// PowerShell script used), with the display-config (CCD) API supplying friendly monitor names.
 /// </summary>
-public sealed unsafe class Win32DisplayManager : IDisplayManager
+public sealed unsafe class Win32DisplayManager(ModeCache modeCache) : IDisplayManager
 {
+    public Win32DisplayManager()
+        : this(new ModeCache(ModeCache.DefaultPath))
+    {
+    }
+
     public IReadOnlyList<DisplayInfo> GetDisplays() => [.. Snapshot().Select(s => s.Info with { DevicePath = s.DevicePath })];
 
     /// <summary>Every connected monitor with its device path (the same path CCD reports for its target).</summary>
     private static List<(string DevicePath, DisplayInfo Info)> Snapshot()
     {
         var friendlyNames = QueryFriendlyNames();
+        var targetsByOutput = ActiveTargetsByOutput();
         var found = new List<(string DevicePath, DisplayInfo Info)>();
 
         var adapter = NewDisplayDevice();
@@ -36,8 +42,18 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             }
 
             string devicePath = monitor.DeviceID.ToString();
-            string hardwareId = ExtractHardwareId(devicePath);
             bool attached = state.HasFlag(DISPLAY_DEVICE_STATE_FLAGS.DISPLAY_DEVICE_ATTACHED_TO_DESKTOP);
+
+            // On laptops with two graphics chips Windows can name the wrong monitor for an output (an output driving the TV
+            // reports the laptop's own panel). For an output that is on the desktop the display configuration says which
+            // monitor it really shows; a mirrored output lists several, and Windows' pick is right when it is among them.
+            if (attached && targetsByOutput.TryGetValue(adapterName, out var targets) &&
+                !targets.Contains(devicePath, StringComparer.OrdinalIgnoreCase))
+            {
+                devicePath = targets[0];
+            }
+
+            string hardwareId = ExtractHardwareId(devicePath);
 
             var current = NewDevMode();
             bool haveCurrent = attached &&
@@ -70,20 +86,32 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
 
     public IReadOnlyList<DisplayMode> GetModes(DisplayInfo display)
     {
-        var modes = new HashSet<DisplayMode>(EnumerateModes(display.AdapterName));
+        var listed = EnumerateModes(display.AdapterName);
 
-        // Windows lists a monitor's modes through the output that drives it. For one that is off the desktop that is a short
-        // generic list, and for one Windows doesn't list at all it is nothing, so add what the monitor says it supports.
-        if (!display.Attached || modes.Count == 0)
+        // Windows only gives a monitor's full list while it is on the desktop on its own (a duplicate is listed under the
+        // display it mirrors). Remember that list for when the monitor is switched off.
+        if (display.Attached && display.DuplicateOf is null && listed.Count > 0)
         {
-            modes.UnionWith(EdidModes.Parse(ReadEdid(display.DevicePath)));
+            bool sideways = (int)display.Orientation is 1 or 3;
+            modeCache.Remember(display.Key, sideways ? [.. listed.Select(m => m with { Width = m.Height, Height = m.Width })] : listed);
+            return Sorted(listed);
         }
 
-        return modes
-            .OrderByDescending(m => (long)m.Width * m.Height)
-            .ThenByDescending(m => m.RefreshHz)
-            .ToList();
+        var remembered = modeCache.Get(display.Key);
+        if (remembered.Count > 0)
+        {
+            return Sorted(remembered);
+        }
+
+        // Never seen on the desktop: the generic list Windows gives, plus what the monitor itself says it supports (its EDID).
+        var modes = new HashSet<DisplayMode>(listed);
+        modes.UnionWith(EdidModes.Parse(ReadEdid(display.DevicePath)));
+        return Sorted(modes);
     }
+
+    // The order of Windows' own lists: widest first, then tallest, then fastest.
+    private static List<DisplayMode> Sorted(IEnumerable<DisplayMode> modes) =>
+        [.. modes.OrderByDescending(m => m.Width).ThenByDescending(m => m.Height).ThenByDescending(m => m.RefreshHz)];
 
     private static List<DisplayMode> EnumerateModes(string adapterName)
     {
@@ -331,6 +359,50 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
         devicePath = request.monitorDevicePath.ToString();
         friendlyName = request.monitorFriendlyDeviceName.ToString();
         return true;
+    }
+
+    private static bool TryGetSourceName(LUID adapter, uint sourceId, out string gdiName)
+    {
+        var request = new DISPLAYCONFIG_SOURCE_DEVICE_NAME();
+        request.header.type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+        request.header.size = (uint)sizeof(DISPLAYCONFIG_SOURCE_DEVICE_NAME);
+        request.header.adapterId = adapter;
+        request.header.id = sourceId;
+
+        if (PInvoke.DisplayConfigGetDeviceInfo((DISPLAYCONFIG_DEVICE_INFO_HEADER*)&request) != 0)
+        {
+            gdiName = string.Empty;
+            return false;
+        }
+
+        gdiName = request.viewGdiDeviceName.ToString();
+        return true;
+    }
+
+    /// <summary>
+    /// For every output that is on the desktop (by its GDI name, such as \\.\DISPLAY1), the device paths of the monitors the
+    /// display configuration says it shows. Several paths mean the monitors mirror each other.
+    /// </summary>
+    private static Dictionary<string, List<string>> ActiveTargetsByOutput()
+    {
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS).Paths)
+        {
+            if (!TryGetSourceName(path.sourceInfo.adapterId, path.sourceInfo.id, out string gdiName) ||
+                !TryGetTargetName(path.targetInfo.adapterId, path.targetInfo.id, out string devicePath, out _))
+            {
+                continue;
+            }
+
+            if (!result.TryGetValue(gdiName, out var targets))
+            {
+                result[gdiName] = targets = [];
+            }
+
+            targets.Add(devicePath);
+        }
+
+        return result;
     }
 
     private static Dictionary<string, string> QueryFriendlyNames()

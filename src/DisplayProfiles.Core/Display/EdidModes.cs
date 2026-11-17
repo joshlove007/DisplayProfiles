@@ -82,7 +82,8 @@ public static class EdidModes
         }
 
         return [.. modes
-            .OrderByDescending(m => (long)m.Width * m.Height)
+            .OrderByDescending(m => m.Width)
+            .ThenByDescending(m => m.Height)
             .ThenByDescending(m => m.RefreshHz)];
     }
 

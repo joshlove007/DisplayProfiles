@@ -14,6 +14,7 @@ public sealed partial class MonitorViewModel : ObservableObject
     private readonly List<DisplayMode> supported;
     private List<DisplayMode> modes;
     private List<(int Width, int Height)> resolutions = [];
+    private List<int> refreshRates = [];
     private bool loading = true;
 
     public MonitorViewModel(MonitorConfig config, int number, bool isConnected, IReadOnlyList<DisplayMode> supportedModes)
@@ -32,7 +33,7 @@ public sealed partial class MonitorViewModel : ObservableObject
         }
 
         allModes = [.. modes];
-        resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => (long)r.Width * r.Height)];
+        resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => r.Width).ThenByDescending(r => r.Height)];
         ResolutionLabels = [.. resolutions.Select(r => $"{r.Width} × {r.Height}")];
 
         Enabled = config.Enabled;
@@ -146,7 +147,10 @@ public sealed partial class MonitorViewModel : ObservableObject
 
     public string Summary => !Enabled
         ? (IsConnected ? "Off" : "Off · not connected")
-        : $"{Width} × {Height}, {RefreshHz} Hz{(IsPrimary ? " · Main display" : string.Empty)}{(GroupNote.Length > 0 ? " · " + GroupNote : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
+        : $"{Width} × {Height}, {RefreshText}{(IsPrimary ? " · Main display" : string.Empty)}{(GroupNote.Length > 0 ? " · " + GroupNote : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
+
+    /// <summary>The refresh rate as Windows Settings names it (59.94 Hz where the driver reports 59).</summary>
+    private string RefreshText => RefreshRates.Label(RefreshHz, modes.Where(m => (m.Width, m.Height) == (Width, Height)).Select(m => m.RefreshHz));
 
     public MonitorConfig ToConfig() => new()
     {
@@ -204,7 +208,7 @@ public sealed partial class MonitorViewModel : ObservableObject
         }
 
         modes = wanted;
-        resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => (long)r.Width * r.Height)];
+        resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => r.Width).ThenByDescending(r => r.Height)];
 
         bool previous = loading;
         loading = true;
@@ -269,12 +273,12 @@ public sealed partial class MonitorViewModel : ObservableObject
 
     partial void OnRefreshIndexChanged(int value)
     {
-        if (loading || value < 0 || value >= RefreshLabels.Count)
+        if (loading || value < 0 || value >= refreshRates.Count)
         {
             return;
         }
 
-        RefreshHz = ParseHz(RefreshLabels[value]);
+        RefreshHz = refreshRates[value];
     }
 
     partial void OnOrientationIndexChanged(int oldValue, int newValue)
@@ -307,10 +311,11 @@ public sealed partial class MonitorViewModel : ObservableObject
     {
         var current = ResolutionIndex >= 0 && ResolutionIndex < resolutions.Count ? resolutions[ResolutionIndex] : (Width, Height);
         var rates = modes.Where(m => (m.Width, m.Height) == current).Select(m => m.RefreshHz).Distinct().OrderByDescending(r => r).ToList();
+        refreshRates = rates;
 
         bool previous = loading;
         loading = true;
-        RefreshLabels = [.. rates.Select(r => $"{r} Hz")];
+        RefreshLabels = [.. rates.Select(r => RefreshRates.Label(r, rates))];
         int index = rates.IndexOf(RefreshHz);
         if (index < 0 && rates.Count > 0)
         {
@@ -321,6 +326,4 @@ public sealed partial class MonitorViewModel : ObservableObject
         RefreshIndex = index;
         loading = previous;
     }
-
-    private static int ParseHz(string label) => int.TryParse(label.Split(' ')[0], out int hz) ? hz : 0;
 }
