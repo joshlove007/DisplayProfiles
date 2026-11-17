@@ -129,4 +129,5 @@ builds the Game Bar widget and the app for x64 and arm64 and merges them into on
 
 The Store signs packages itself and gives them their own identity, so it gets a separate, unsigned build:
 `.\tools\Build-StorePackage.ps1` makes one `.msixbundle` (x64 and arm64) with the name and publisher from Partner Center. The last
-part of the Store version must be 0.
+part of the Store version must be 0. The listing text, certification notes and screenshots for Partner Center are in
+[docs/store](store/listing.md).
