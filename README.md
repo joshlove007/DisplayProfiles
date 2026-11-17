@@ -30,8 +30,10 @@ a TV for gaming, and an Xbox controller.
 
 ## Features
 
-- **Profile editor** with a draggable, snapping monitor map like Settings > Display, per-display on/off, main display,
-  resolution, refresh rate and orientation, and a choice of extending the desktop or duplicating another display.
+- **Profile editor** with a draggable, snapping monitor map like Settings > Display (drop a display between two others to
+  insert it), per-display on/off, main display, resolution, refresh rate and orientation, and a choice of extending the
+  desktop or duplicating another display. Duplicated displays share their settings and show one tile such as "3|4", and
+  **Identify** and **Refresh** work like their Settings counterparts.
   Edits stay in the editor until you press **Save**, so you can try a layout
   with **Apply** before deciding to keep it.
 - **Safe applying.** The app checks that every monitor really came up (retrying if a TV is slow to wake), restores your
@@ -45,6 +47,10 @@ a TV for gaming, and an Xbox controller.
 
 <p align="center">
   <img src="docs/images/display-options.png" alt="Per-display options" width="49%" />
+  <img src="docs/images/duplicate-displays.png" alt="Duplicating a display: the pair shares its settings and shows as one tile" width="49%" />
+</p>
+
+<p align="center">
   <img src="docs/images/xbox-mode-page.png" alt="Choosing the profiles for Xbox mode" width="49%" />
 </p>
 
