@@ -190,6 +190,10 @@ this builds the same package the releases contain (signed with a self-signed cer
 | `tools/` | Icon generator and the widget and package build and install scripts |
 | `docs/` | Documentation and screenshots |
 
+## Privacy
+
+No data leaves your PC; see [PRIVACY.md](PRIVACY.md).
+
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).

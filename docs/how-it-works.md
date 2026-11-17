@@ -124,3 +124,9 @@ Controller mode is the same app with a different shell:
 Pushing a tag such as `v0.1.0-beta.1` runs the [release workflow](../.github/workflows/release.yml). It runs the tests,
 builds the Game Bar widget and the app for x64 and arm64 and merges them into one MSIX per architecture
 (`tools/Build-Package.ps1`), signs the packages with Azure Artifact Signing, and creates the GitHub release. Tags with a suffix are marked as pre-releases.
+
+### Microsoft Store
+
+The Store signs packages itself and gives them their own identity, so it gets a separate, unsigned build:
+`.\tools\Build-StorePackage.ps1` makes one `.msixbundle` (x64 and arm64) with the name and publisher from Partner Center. The last
+part of the Store version must be 0.
