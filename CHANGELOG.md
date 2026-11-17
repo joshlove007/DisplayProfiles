@@ -5,6 +5,8 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta.4]
+
 ### Added
 
 - Each display has a **Multiple displays** setting: keep the default "Extend desktop to this display", or choose "Duplicate
@@ -54,6 +56,7 @@ First public beta.
 - Responsive layout that adapts to narrow windows.
 - Installers for x64 and arm64 (per user), portable zips and the Game Bar widget package.
 
-[Unreleased]: https://github.com/joshlove007/DisplayProfiles/compare/v0.1.0-beta.3...HEAD
+[Unreleased]: https://github.com/joshlove007/DisplayProfiles/compare/v0.1.0-beta.4...HEAD
+[0.1.0-beta.4]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.4
 [0.1.0-beta.3]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.3
 [0.1.0-beta.1]: https://github.com/joshlove007/DisplayProfiles/releases/tag/v0.1.0-beta.1
