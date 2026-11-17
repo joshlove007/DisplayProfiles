@@ -54,12 +54,14 @@ public class LayoutMathTests
     }
 
     [Fact]
-    public void Snap_does_not_move_when_far_from_other_monitors()
+    public void Snap_pulls_a_far_away_monitor_against_the_others()
     {
         var a = Mon("A", 0, 0, primary: true);
         var b = Mon("B", 5000, 5000);
 
-        Assert.Equal((4000, 4000), LayoutMath.Snap(b, 4000, 4000, [a, b], threshold: 80));
+        var (x, y) = LayoutMath.Snap(b, 4000, 4000, [a, b], threshold: 80);
+
+        Assert.True(LayoutMath.Touches(b with { X = x, Y = y }, a));
     }
 
     [Fact]
@@ -135,5 +137,81 @@ public class LayoutMathTests
         Assert.True(LayoutMath.AreEquivalent(saved, live));
         Assert.False(LayoutMath.AreEquivalent(saved, extended));
         Assert.False(LayoutMath.AreEquivalent(extended, otherPair));
+    }
+
+    [Fact]
+    public void CloseGaps_pulls_a_floating_monitor_against_the_rest()
+    {
+        var layout = new[] { Mon("A", 0, 0, primary: true), Mon("B", 5120, 0), Dup("C", of: "B", x: 5120) };
+
+        var closed = LayoutMath.CloseGaps(layout);
+
+        Assert.True(LayoutMath.Touches(closed.Single(m => m.Key == "A"), closed.Single(m => m.Key == "B")));
+        Assert.Empty(LayoutMath.Validate(LayoutMath.Normalize(closed)));
+    }
+
+    [Fact]
+    public void CloseGaps_leaves_a_connected_layout_alone()
+    {
+        var layout = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0) };
+
+        Assert.Equal(layout, LayoutMath.CloseGaps(layout));
+    }
+
+    [Fact]
+    public void PlanMove_inserts_between_two_monitors_and_moves_the_rest_along()
+    {
+        var a = Mon("A", 0, 0, primary: true);
+        var b = Mon("B", 2560, 0);
+        var c = Mon("C", 5120, 0);
+
+        // C dropped with its centre over the left half of B: it goes before B and B moves right to make room.
+        var plan = LayoutMath.PlanMove(c, 1500, 0, [a, b, c], threshold: 0);
+
+        Assert.Equal((2560, 0), (plan.X, plan.Y));
+        Assert.Equal(("B", 5120, 0), Assert.Single(plan.Shifts));
+    }
+
+    [Fact]
+    public void PlanMove_inserts_after_the_monitor_when_dropped_on_its_right_half()
+    {
+        var a = Mon("A", 0, 0, primary: true);
+        var b = Mon("B", 2560, 0);
+        var c = Mon("C", 5120, 0);
+
+        var plan = LayoutMath.PlanMove(a, 3400, 0, [a, b, c], threshold: 0);
+
+        Assert.Equal((5120, 0), (plan.X, plan.Y));
+        Assert.Equal(("C", 7680, 0), Assert.Single(plan.Shifts));
+    }
+
+    [Fact]
+    public void PlanMove_only_snaps_when_not_dropped_over_another_monitor()
+    {
+        var a = Mon("A", 0, 0, primary: true);
+        var b = Mon("B", 5000, 0);
+
+        var plan = LayoutMath.PlanMove(b, 2600, 30, [a, b], threshold: 80);
+
+        Assert.Empty(plan.Shifts);
+        Assert.True(LayoutMath.Touches(b with { X = plan.X, Y = plan.Y }, a));
+    }
+
+    [Fact]
+    public void PlanMove_closes_the_gap_the_dragged_monitor_leaves_before_inserting()
+    {
+        // A B C in a row. Dragging B onto the left half of A: A and C close up around B's old place, so the whole row ends
+        // up as B A C with no extra space (C does not move away).
+        var a = Mon("A", 0, 0, primary: true);
+        var b = Mon("B", 2560, 0);
+        var c = Mon("C", 5120, 0);
+
+        var plan = LayoutMath.PlanMove(b, -1000, 0, [a, b, c], threshold: 0);
+
+        Assert.Equal((0, 0), (plan.X, plan.Y));
+        var final = new Dictionary<string, (int X, int Y)> { ["A"] = (0, 0), ["C"] = (5120, 0) };
+        foreach (var s in plan.Shifts) { final[s.Key] = (s.X, s.Y); }
+        Assert.Equal((2560, 0), final["A"]);
+        Assert.Equal((5120, 0), final["C"]);
     }
 }

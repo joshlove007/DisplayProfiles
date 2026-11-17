@@ -5,6 +5,29 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta.6]
+
+### Added
+
+- **Refresh displays** button next to Identify, to look for the connected displays again.
+
+### Changed
+
+- Duplicated displays now all show their settings. Resolution, refresh rate and orientation are shared across the group, and the
+  resolution and refresh rate lists only offer what every display in the group supports, as in Windows Settings. "Display
+  mode" names the other displays in the group, such as "Duplicate display 1 and 4", before you pick it.
+- The map shows a duplicated group as one tile such as "1|3".
+- Displays always snap together on the map and can't be left with gaps. Drag a display between two others to insert it there;
+  the layout updates when you let go, and a marker shows where it will land.
+- Identify appears instantly and looks like the one in Windows Settings: a dark rounded box in the bottom-left corner of each
+  display, with one box for a duplicated group.
+
+### Fixed
+
+- Duplicating a display onto one that is connected to a different graphics adapter (for example a TV on the GPU and monitors on
+  the processor graphics) failed even though Windows Settings could do it.
+- Changing a display between extend and duplicate didn't update its resolution list until you switched profiles.
+
 ## [0.1.0-beta.5]
 
 ### Fixed

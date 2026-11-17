@@ -203,6 +203,10 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
 
     private const int MaxApplyAttempts = 3;
 
+    // Windows names one display of a mirrored group as the one the others mirror, which isn't necessarily the one a profile named.
+    private static string Original(IReadOnlyList<DisplayInfo> displays, string key) =>
+        displays.FirstOrDefault(d => d.Key == key) is { } display ? display.DuplicateOf ?? display.Key : key;
+
     private bool WaitUntilApplied(ApplyPlan plan, out string problem)
     {
         problem = string.Empty;
@@ -219,7 +223,7 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
                 .Select(p => p.Config.Name)
                 .ToList();
             var notMirrored = plan.Duplicates
-                .Where(p => !now.Any(d => d.Attached && ((d.Key == p.Key && d.DuplicateOf == p.ParentKey) || (d.Key == p.ParentKey && d.DuplicateOf == p.Key))))
+                .Where(p => !now.Any(d => d.Key == p.Key && d.Attached) || Original(now, p.Key) != Original(now, p.ParentKey))
                 .Select(p => $"{p.Name} on {p.ParentName}")
                 .ToList();
             if (off.Count == 0 && notMirrored.Count == 0)

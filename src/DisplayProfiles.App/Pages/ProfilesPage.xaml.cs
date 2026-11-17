@@ -247,8 +247,14 @@ public sealed partial class ProfilesPage : Page, IControllerPage
         }
     }
 
+    private void OnRefreshClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.RefreshDisplays();
+        ViewModel.ShowStatus("Looked for the connected displays again.", InfoBarSeverity.Success);
+    }
+
     private void OnIdentifyClick(object sender, RoutedEventArgs e) =>
-        IdentifyOverlay.Show(ViewModel.Service.Displays.GetDisplays(), display => ViewModel.NumberFor(display.Key));
+        IdentifyOverlay.Show(ViewModel.Service.Displays.GetDisplays(), key => ViewModel.NumberFor(key));
 
     private void OnMonitorExpanded(object sender, EventArgs e)
     {

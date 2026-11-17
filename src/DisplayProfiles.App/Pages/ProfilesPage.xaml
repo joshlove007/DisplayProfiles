@@ -206,12 +206,21 @@
                         CornerRadius="8">
                         <Grid>
                             <controls:MonitorLayoutView x:Name="LayoutView" />
-                            <Button
-                                Content="Identify"
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="8"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Bottom"
-                                Margin="0,0,0,12"
-                                Click="OnIdentifyClick" />
+                                Margin="0,0,0,12">
+                                <Button Click="OnRefreshClick" ToolTipService.ToolTip="Look for the connected displays again"
+                                        AutomationProperties.Name="Refresh displays">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                        <TextBlock Text="Refresh" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Content="Identify" Click="OnIdentifyClick" />
+                            </StackPanel>
                         </Grid>
                     </Border>
 
@@ -235,27 +244,23 @@
                                     <ToggleSwitch IsOn="{x:Bind Enabled, Mode=TwoWay}" OnContent="On" OffContent="Off" />
                                     <tk:SettingsExpander.Items>
                                         <tk:SettingsCard Header="Make this my main display"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
-                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
                                             <CheckBox IsChecked="{x:Bind IsPrimary, Mode=TwoWay}" MinWidth="0" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display resolution"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
-                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Display resolution"
-                                                       ItemsSource="{x:Bind ResolutionLabels}"
+                                                       ItemsSource="{x:Bind ResolutionLabels, Mode=OneWay}"
                                                        SelectedIndex="{x:Bind ResolutionIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Refresh rate"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
-                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Refresh rate"
                                                        ItemsSource="{x:Bind RefreshLabels, Mode=OneWay}"
                                                        SelectedIndex="{x:Bind RefreshIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display orientation"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
-                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Display orientation"
                                                        ItemsSource="{x:Bind Orientations}"
                                                        SelectedIndex="{x:Bind OrientationIndex, Mode=TwoWay}" />

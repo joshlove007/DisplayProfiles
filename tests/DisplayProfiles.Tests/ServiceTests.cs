@@ -218,6 +218,20 @@ public class ProfileServiceTests : IDisposable
     }
 
     [Fact]
+    public void Several_displays_can_mirror_the_same_display()
+    {
+        var fake = new FakeDisplayManager(Desk());
+        var service = Create(fake);
+        var mirrored = Profile.Create("All", [Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "ASUS"), Dup("TV", of: "ASUS")]);
+
+        var result = service.Apply(mirrored);
+
+        Assert.True(result.Success);
+        var captured = service.CaptureLayout();
+        Assert.All(captured.Where(m => m.Key != "ASUS"), m => Assert.Equal("ASUS", m.DuplicateOf));
+        Assert.True(LayoutMath.AreEquivalent(mirrored.Monitors, captured));
+    }
+    [Fact]
     public void Existing_duplicates_are_broken_up_before_the_next_layout_is_applied()
     {
         var fake = new FakeDisplayManager(Desk());
