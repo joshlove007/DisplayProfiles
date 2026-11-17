@@ -235,26 +235,36 @@
                                     <ToggleSwitch IsOn="{x:Bind Enabled, Mode=TwoWay}" OnContent="On" OffContent="Off" />
                                     <tk:SettingsExpander.Items>
                                         <tk:SettingsCard Header="Make this my main display"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
+                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
                                             <CheckBox IsChecked="{x:Bind IsPrimary, Mode=TwoWay}" MinWidth="0" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display resolution"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
+                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Display resolution"
                                                        ItemsSource="{x:Bind ResolutionLabels}"
                                                        SelectedIndex="{x:Bind ResolutionIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Refresh rate"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
+                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Refresh rate"
                                                        ItemsSource="{x:Bind RefreshLabels, Mode=OneWay}"
                                                        SelectedIndex="{x:Bind RefreshIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Display orientation"
-                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}"
+                                                         Visibility="{x:Bind app:Ui.Visible(IsExtended), Mode=OneWay}">
                                             <controls:OptionPicker MinWidth="200" Title="Display orientation"
                                                        ItemsSource="{x:Bind Orientations}"
                                                        SelectedIndex="{x:Bind OrientationIndex, Mode=TwoWay}" />
+                                        </tk:SettingsCard>
+                                        <tk:SettingsCard Header="Display mode"
+                                                         IsEnabled="{x:Bind Enabled, Mode=OneWay}">
+                                            <controls:OptionPicker MinWidth="200" Title="Display mode"
+                                                       ItemsSource="{x:Bind ModeChoices, Mode=OneWay}"
+                                                       SelectedIndex="{x:Bind ModeIndex, Mode=TwoWay}" />
                                         </tk:SettingsCard>
                                         <tk:SettingsCard Header="Remove this display"
                                                          Description="It isn't connected. This only removes it from this profile."

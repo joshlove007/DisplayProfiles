@@ -37,6 +37,14 @@ public sealed record MonitorConfig
 
     public DisplayOrientation Orientation { get; init; }
 
+    /// <summary>
+    /// When set, this monitor shows the same picture as the monitor with this <see cref="Key"/> (Windows' "duplicate"
+    /// mode) instead of being a separate part of the desktop. It takes that monitor's position, size and refresh rate.
+    /// </summary>
+    public string? DuplicateOf { get; init; }
+
+    public bool IsDuplicate => DuplicateOf is not null;
+
     public int Right => X + Width;
 
     public int Bottom => Y + Height;

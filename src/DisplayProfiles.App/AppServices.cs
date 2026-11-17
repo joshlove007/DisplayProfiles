@@ -15,7 +15,12 @@ internal static class AppServices
         }
 
         var profiles = new ProfileService(new Win32DisplayManager(), new ProfileStore(ProfileStore.DefaultPath));
-        profiles.SeedIfFirstRun(LegacyImporter.DefaultFolder);
+        if (profiles.SeedIfFirstRun(LegacyImporter.DefaultFolder) && profiles.Data.Settings.StartWithWindows)
+        {
+            // First run: start with Windows is on by default, so register it. After that it is only changed in Settings.
+            StartupRegistration.SetEnabled(true, LaunchPath);
+        }
+
         WidgetBridge.EnsureProtocolRegistered(Environment.ProcessPath!);
         profiles.Changed += () => WidgetBridge.Publish(profiles);
         return profiles;

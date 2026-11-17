@@ -94,4 +94,46 @@ public class LayoutMathTests
         Assert.True(LayoutMath.AreEquivalent(one, shifted));
         Assert.False(LayoutMath.AreEquivalent(one, moved));
     }
+
+    [Fact]
+    public void Duplicates_take_no_part_in_overlap_and_touch_checks()
+    {
+        var layout = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0), Dup("C", of: "A"), Dup("D", of: "B", x: 2560) };
+
+        Assert.Empty(LayoutMath.Validate(layout));
+    }
+
+    [Fact]
+    public void A_duplicate_of_a_display_that_is_off_or_itself_a_duplicate_is_flagged()
+    {
+        var ofOff = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0, enabled: false), Dup("C", of: "B") };
+        var chained = new[] { Mon("A", 0, 0, primary: true), Dup("B", of: "A"), Dup("C", of: "B") };
+
+        Assert.Contains(LayoutMath.Validate(ofOff), i => i.Kind == LayoutIssueKind.Duplicate);
+        Assert.Contains(LayoutMath.Validate(chained), i => i.Kind == LayoutIssueKind.Duplicate);
+    }
+
+    [Fact]
+    public void Normalize_never_anchors_on_a_duplicate_and_moves_it_with_its_original()
+    {
+        var layout = LayoutMath.Normalize([Mon("A", 100, 50, primary: true), Dup("B", of: "A", x: 100, y: 50)]);
+
+        Assert.True(layout.Single(m => m.Key == "A").IsPrimary);
+        var b = layout.Single(m => m.Key == "B");
+        Assert.False(b.IsPrimary);
+        Assert.Equal((0, 0), (b.X, b.Y));
+    }
+
+    [Fact]
+    public void AreEquivalent_does_not_care_which_of_two_mirrored_displays_is_the_original()
+    {
+        var saved = new[] { Mon("A", 0, 0, primary: true), Dup("B", of: "A") };
+        var live = new[] { Mon("B", 0, 0, primary: true), Dup("A", of: "B") };
+        var extended = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0) };
+        var otherPair = new[] { Mon("A", 0, 0, primary: true), Mon("B", 2560, 0), Dup("C", of: "B", x: 2560) };
+
+        Assert.True(LayoutMath.AreEquivalent(saved, live));
+        Assert.False(LayoutMath.AreEquivalent(saved, extended));
+        Assert.False(LayoutMath.AreEquivalent(extended, otherPair));
+    }
 }

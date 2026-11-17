@@ -119,7 +119,7 @@ $protocol.AppendChild($protocolName) | Out-Null
 $extensions.AppendChild($protocol) | Out-Null
 
 $startup = New-Element 'uap5:Extension' $uri.uap5 @{ Category = 'windows.startupTask'; Executable = 'DisplayProfiles.exe'; EntryPoint = 'Windows.FullTrustApplication' }
-$startup.AppendChild((New-Element 'uap5:StartupTask' $uri.uap5 @{ TaskId = 'DisplayProfilesStartup'; Enabled = 'false'; DisplayName = 'Display Profiles' })) | Out-Null
+$startup.AppendChild((New-Element 'uap5:StartupTask' $uri.uap5 @{ TaskId = 'DisplayProfilesStartup'; Enabled = 'true'; DisplayName = 'Display Profiles' })) | Out-Null
 $extensions.AppendChild($startup) | Out-Null
 
 $alias = New-Element 'uap3:Extension' $uri.uap3 @{ Category = 'windows.appExecutionAlias'; Executable = 'DisplayProfiles.exe'; EntryPoint = 'Windows.FullTrustApplication' }

@@ -12,7 +12,10 @@ namespace DisplayProfiles.Core.Display;
 /// </summary>
 public sealed unsafe class Win32DisplayManager : IDisplayManager
 {
-    public IReadOnlyList<DisplayInfo> GetDisplays()
+    public IReadOnlyList<DisplayInfo> GetDisplays() => [.. Snapshot().Select(s => s.Info)];
+
+    /// <summary>Every connected monitor with its device path (the same path CCD reports for its target).</summary>
+    private static List<(string DevicePath, DisplayInfo Info)> Snapshot()
     {
         var friendlyNames = QueryFriendlyNames();
         var found = new List<(string DevicePath, DisplayInfo Info)>();
@@ -62,7 +65,7 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             adapter = NewDisplayDevice();
         }
 
-        return DisambiguateKeys(CollapseDuplicateOutputs(found));
+        return DisambiguateKeys(MarkMirrored(CollapseDuplicateOutputs(found)));
     }
 
     public IReadOnlyList<DisplayMode> GetModes(string adapterName)
@@ -102,6 +105,25 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
         {
             throw new DisplayApplyException($"Windows could not apply the display settings ({Describe(result)}).");
         }
+
+        if (plan.Duplicates.Count > 0)
+        {
+            // Let the new layout settle so the display configuration describes it.
+            Thread.Sleep(1000);
+            Mirror(plan.Duplicates);
+        }
+    }
+
+    public void BreakDuplicates()
+    {
+        var result = PInvoke.SetDisplayConfig([], [], SET_DISPLAY_CONFIG_FLAGS.SDC_APPLY | SET_DISPLAY_CONFIG_FLAGS.SDC_TOPOLOGY_EXTEND);
+        if (result != 0)
+        {
+            throw new DisplayApplyException($"Windows could not separate the duplicated displays (error {result}).");
+        }
+
+        // The displays reappear one by one; give Windows time to finish.
+        Thread.Sleep(3000);
     }
 
     private const uint EddGetDeviceInterfaceName = 1;
@@ -209,63 +231,237 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             .Select(g => g.OrderByDescending(f => f.Info.Attached).ThenBy(f => f.Info.AdapterName, StringComparer.OrdinalIgnoreCase).First())
             .ToList();
 
-    // Two identical monitors share a hardware id; number them (#2, #3 ...) in a stable order.
-    private static List<DisplayInfo> DisambiguateKeys(List<(string DevicePath, DisplayInfo Info)> found)
+    // Two identical monitors share a hardware id; number them (#2, #3 ...) in a stable order. Mirrored monitors name the
+    // device path of the monitor they mirror (in DuplicateOf) until the final keys are known.
+    private static List<(string DevicePath, DisplayInfo Info)> DisambiguateKeys(List<(string DevicePath, DisplayInfo Info)> found)
     {
-        var result = new List<DisplayInfo>(found.Count);
+        var result = new List<(string DevicePath, DisplayInfo Info)>(found.Count);
         foreach (var group in found.GroupBy(f => f.Info.Key, StringComparer.Ordinal))
         {
             int n = 0;
             foreach (var item in group.OrderBy(f => f.DevicePath, StringComparer.OrdinalIgnoreCase))
             {
                 n++;
-                result.Add(n == 1 ? item.Info : item.Info with { Key = $"{item.Info.Key}#{n}" });
+                result.Add(n == 1 ? item : (item.DevicePath, item.Info with { Key = $"{item.Info.Key}#{n}" }));
             }
         }
 
-        return result.OrderBy(d => d.AdapterName, StringComparer.OrdinalIgnoreCase).ToList();
+        var keyByPath = result.ToDictionary(r => r.DevicePath, r => r.Info.Key, StringComparer.OrdinalIgnoreCase);
+        return [.. result
+            .Select(r => r.Info.DuplicateOf is { } parentPath && keyByPath.TryGetValue(parentPath, out var parentKey)
+                ? (r.DevicePath, Info: r.Info with { DuplicateOf = parentKey })
+                : r)
+            .OrderBy(r => r.Info.AdapterName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(r => r.DevicePath, StringComparer.OrdinalIgnoreCase)];
+    }
+    private const uint PathActive = 0x1; // DISPLAYCONFIG_PATH_ACTIVE
+    private const uint ModeIndexInvalid = 0xFFFFFFFF; // DISPLAYCONFIG_PATH_MODE_IDX_INVALID
+
+    private static (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS flags)
+    {
+        if (PInvoke.GetDisplayConfigBufferSizes(flags, out uint pathCount, out uint modeCount) != WIN32_ERROR.ERROR_SUCCESS)
+        {
+            return ([], []);
+        }
+
+        var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+        var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+        if (PInvoke.QueryDisplayConfig(flags, ref pathCount, paths, ref modeCount, modes) != WIN32_ERROR.ERROR_SUCCESS)
+        {
+            return ([], []);
+        }
+
+        return (paths[..(int)pathCount], modes[..(int)modeCount]);
+    }
+
+    private static bool TryGetTargetName(LUID adapter, uint targetId, out string devicePath, out string friendlyName)
+    {
+        var request = new DISPLAYCONFIG_TARGET_DEVICE_NAME();
+        request.header.type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+        request.header.size = (uint)sizeof(DISPLAYCONFIG_TARGET_DEVICE_NAME);
+        request.header.adapterId = adapter;
+        request.header.id = targetId;
+
+        if (PInvoke.DisplayConfigGetDeviceInfo((DISPLAYCONFIG_DEVICE_INFO_HEADER*)&request) != 0)
+        {
+            devicePath = friendlyName = string.Empty;
+            return false;
+        }
+
+        devicePath = request.monitorDevicePath.ToString();
+        friendlyName = request.monitorFriendlyDeviceName.ToString();
+        return true;
     }
 
     private static Dictionary<string, string> QueryFriendlyNames()
     {
         var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        if (PInvoke.GetDisplayConfigBufferSizes(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS, out uint pathCount, out uint modeCount) != WIN32_ERROR.ERROR_SUCCESS)
-        {
-            return names;
-        }
-
-        var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
-        var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
-        if (PInvoke.QueryDisplayConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS, ref pathCount, paths, ref modeCount, modes) != WIN32_ERROR.ERROR_SUCCESS)
-        {
-            return names;
-        }
-
         var seen = new HashSet<(uint, int, uint)>();
-        for (int i = 0; i < pathCount; i++)
+        foreach (var path in QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS).Paths)
         {
-            var target = paths[i].targetInfo;
-            if (!seen.Add((target.adapterId.LowPart, target.adapterId.HighPart, target.id)))
+            var target = path.targetInfo;
+            if (seen.Add((target.adapterId.LowPart, target.adapterId.HighPart, target.id)) &&
+                TryGetTargetName(target.adapterId, target.id, out string devicePath, out string friendly))
             {
-                continue;
-            }
-
-            var request = new DISPLAYCONFIG_TARGET_DEVICE_NAME();
-            request.header.type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
-            request.header.size = (uint)sizeof(DISPLAYCONFIG_TARGET_DEVICE_NAME);
-            request.header.adapterId = target.adapterId;
-            request.header.id = target.id;
-
-            if (PInvoke.DisplayConfigGetDeviceInfo((DISPLAYCONFIG_DEVICE_INFO_HEADER*)&request) == 0)
-            {
-                names[request.monitorDevicePath.ToString()] = request.monitorFriendlyDeviceName.ToString();
+                names[devicePath] = friendly;
             }
         }
 
         return names;
     }
 
+    /// <summary>
+    /// Windows shows a duplicated (mirrored) display only under the display it mirrors, and the mirrored one can be
+    /// missing from the adapter list altogether. The display configuration knows better: monitors that share one source
+    /// show the same picture. The monitor Windows still lists as attached is the original; the others are marked as its
+    /// duplicates (naming its device path for now, see <see cref="DisambiguateKeys"/>).
+    /// </summary>
+    private static List<(string DevicePath, DisplayInfo Info)> MarkMirrored(List<(string DevicePath, DisplayInfo Info)> found)
+    {
+        var bySource = new Dictionary<(uint Low, int High, uint Id), List<(string DevicePath, string Name)>>();
+        foreach (var path in QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS).Paths)
+        {
+            if (!TryGetTargetName(path.targetInfo.adapterId, path.targetInfo.id, out string devicePath, out string name))
+            {
+                continue;
+            }
+
+            var source = (path.sourceInfo.adapterId.LowPart, path.sourceInfo.adapterId.HighPart, path.sourceInfo.id);
+            if (!bySource.TryGetValue(source, out var members))
+            {
+                bySource[source] = members = [];
+            }
+
+            members.Add((devicePath, name));
+        }
+
+        foreach (var members in bySource.Values.Where(m => m.Count > 1))
+        {
+            int parentAt = found.FindIndex(f => f.Info.Attached &&
+                members.Any(m => string.Equals(m.DevicePath, f.DevicePath, StringComparison.OrdinalIgnoreCase)));
+            if (parentAt < 0)
+            {
+                continue;
+            }
+
+            var parent = found[parentAt];
+            foreach (var member in members.Where(m => !string.Equals(m.DevicePath, parent.DevicePath, StringComparison.OrdinalIgnoreCase)))
+            {
+                int at = found.FindIndex(f => string.Equals(f.DevicePath, member.DevicePath, StringComparison.OrdinalIgnoreCase));
+                string hardwareId = ExtractHardwareId(member.DevicePath);
+                var info = at >= 0
+                    ? found[at].Info
+                    : new DisplayInfo
+                    {
+                        AdapterName = parent.Info.AdapterName,
+                        Key = hardwareId,
+                        FriendlyName = string.IsNullOrWhiteSpace(member.Name) ? hardwareId : member.Name,
+                    };
+                var mirrored = info with
+                {
+                    Attached = true,
+                    IsPrimary = false,
+                    X = parent.Info.X,
+                    Y = parent.Info.Y,
+                    Width = parent.Info.Width,
+                    Height = parent.Info.Height,
+                    RefreshHz = parent.Info.RefreshHz,
+                    Orientation = parent.Info.Orientation,
+                    DuplicateOf = parent.DevicePath,
+                };
+
+                if (at >= 0)
+                {
+                    found[at] = (member.DevicePath, mirrored);
+                }
+                else
+                {
+                    found.Add((member.DevicePath, mirrored));
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// Makes each planned duplicate share the source (the picture) of the display it mirrors, by rewriting the display
+    /// paths: the duplicate's own path is dropped and a path to the same monitor on the original's source is added.
+    /// </summary>
+    private static void Mirror(IReadOnlyList<PlannedDuplicate> duplicates)
+    {
+        var (active, modes) = QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS);
+        var all = QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS).Paths;
+
+        // After a mirror Windows' monitor list can be missing the very monitors being set up, so the keys come from the
+        // display configuration itself; where the list does know a monitor, its key is used (they can differ for
+        // identical monitors).
+        var devicePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in active.Concat(all))
+        {
+            if (TryGetTargetName(path.targetInfo.adapterId, path.targetInfo.id, out string devicePath, out _))
+            {
+                devicePaths.Add(devicePath);
+            }
+        }
+
+        var keyByPath = devicePaths
+            .GroupBy(ExtractHardwareId)
+            .SelectMany(g => g.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).Select((p, i) => (Path: p, Key: i == 0 ? g.Key : $"{g.Key}#{i + 1}")))
+            .ToDictionary(x => x.Path, x => x.Key, StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, info) in Snapshot())
+        {
+            keyByPath[path] = info.Key;
+        }
+
+        string? KeyOf(DISPLAYCONFIG_PATH_TARGET_INFO target) =>
+            TryGetTargetName(target.adapterId, target.id, out string devicePath, out _) && keyByPath.TryGetValue(devicePath, out var key)
+                ? key
+                : null;
+
+        var paths = active.ToList();
+
+        foreach (var duplicate in duplicates)
+        {
+            paths.RemoveAll(p => KeyOf(p.targetInfo) == duplicate.Key);
+            int parentAt = paths.FindIndex(p => KeyOf(p.targetInfo) == duplicate.ParentKey);
+            if (parentAt < 0)
+            {
+                throw new DisplayApplyException($"{duplicate.ParentName} isn't switched on, so {duplicate.Name} can't duplicate it.");
+            }
+
+            var parent = paths[parentAt];
+
+            // The monitor has to be reachable from the graphics output that draws the original.
+            var candidate = all
+                .Where(p => KeyOf(p.targetInfo) == duplicate.Key &&
+                    p.sourceInfo.adapterId.LowPart == parent.sourceInfo.adapterId.LowPart &&
+                    p.sourceInfo.adapterId.HighPart == parent.sourceInfo.adapterId.HighPart)
+                .Select(p => (DISPLAYCONFIG_PATH_INFO?)p)
+                .FirstOrDefault();
+            if (candidate is not { } mirrorPath)
+            {
+                throw new DisplayApplyException(
+                    $"{duplicate.Name} can't duplicate {duplicate.ParentName}: Windows can't drive both from the same graphics output.");
+            }
+
+            mirrorPath.sourceInfo.id = parent.sourceInfo.id;
+            mirrorPath.sourceInfo.Anonymous = parent.sourceInfo.Anonymous;
+            mirrorPath.targetInfo.Anonymous.modeInfoIdx = ModeIndexInvalid;
+            mirrorPath.flags |= PathActive;
+            paths.Add(mirrorPath);
+        }
+
+        var result = PInvoke.SetDisplayConfig(
+            paths.ToArray(),
+            modes,
+            SET_DISPLAY_CONFIG_FLAGS.SDC_APPLY | SET_DISPLAY_CONFIG_FLAGS.SDC_USE_SUPPLIED_DISPLAY_CONFIG |
+            SET_DISPLAY_CONFIG_FLAGS.SDC_ALLOW_CHANGES | SET_DISPLAY_CONFIG_FLAGS.SDC_SAVE_TO_DATABASE);
+        if (result != 0)
+        {
+            throw new DisplayApplyException($"Windows could not duplicate the displays (error {result}).");
+        }
+    }
     // Windows labels the two portrait modes the other way round from the raw DMDO angles.
     private static DEVMODE_DISPLAY_ORIENTATION ToDmdo(DisplayOrientation o) => o switch
     {

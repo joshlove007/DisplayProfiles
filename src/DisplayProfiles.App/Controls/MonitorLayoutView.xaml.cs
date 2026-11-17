@@ -80,7 +80,8 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
             return;
         }
 
-        var enabled = editor.Monitors.Where(m => m.Enabled).ToList();
+        // A display that duplicates another shares its tile.
+        var enabled = editor.Monitors.Where(m => m.Enabled && !m.IsDuplicate).ToList();
         EmptyHint.Visibility = enabled.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (enabled.Count == 0)
         {
@@ -103,11 +104,14 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
 
         foreach (var monitor in enabled)
         {
+            var mirrored = editor.Monitors.Where(m => m.Enabled && m.DuplicateOf == monitor.Key).OrderBy(m => m.Number).ToList();
+            string label = string.Join(" | ", new[] { monitor.Number }.Concat(mirrored.Select(m => m.Number))
+                .Select(n => n.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             var number = new TextBlock
             {
-                Text = monitor.Number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Text = label,
                 Style = (Style)Resources["TileNumberStyle"],
-                FontSize = Math.Clamp(monitor.Height * scale * 0.38, 14, 40),
+                FontSize = Math.Clamp(monitor.Height * scale * 0.38, 14, 40) * (mirrored.Count > 0 ? 0.8 : 1),
             };
             var tile = new ContentControl
             {
@@ -116,10 +120,13 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
                 Content = number,
                 Tag = monitor,
             };
-            AutomationHelper.SetName(tile, $"Display {monitor.Number}, {monitor.Name}");
+            string names = string.Join(" and ", new[] { monitor.Name }.Concat(mirrored.Select(m => m.Name)));
+            AutomationHelper.SetName(tile, mirrored.Count == 0
+                ? $"Display {monitor.Number}, {monitor.Name}"
+                : $"Displays {label.Replace(" | ", " and ", StringComparison.Ordinal)} duplicated, {names}");
             if (!ControllerUi.IsActive)
             {
-                ToolTipService.SetToolTip(tile, $"{monitor.Name}\n{monitor.Width} × {monitor.Height}");
+                ToolTipService.SetToolTip(tile, $"{names}\n{monitor.Width} × {monitor.Height}");
             }
             tile.PointerPressed += OnPointerPressed;
             tile.PointerMoved += OnPointerMoved;
@@ -157,7 +164,7 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
     {
         foreach (var (monitor, (tile, number)) in tiles)
         {
-            bool selected = monitor == editor?.SelectedMonitor;
+            bool selected = monitor == editor?.SelectedMonitor || (editor?.SelectedMonitor is { DuplicateOf: { } original } && original == monitor.Key);
             string tileStyle = monitor == grabbed ? "GrabbedTileStyle" : selected ? "SelectedTileStyle" : "TileStyle";
             tile.Style = (Style)Resources[tileStyle];
             number.Style = (Style)Resources[selected ? "SelectedTileNumberStyle" : "TileNumberStyle"];

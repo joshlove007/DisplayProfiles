@@ -62,6 +62,30 @@ public class ApplyPlannerTests
 
         Assert.Throws<DisplayApplyException>(() => ApplyPlanner.Plan(overlapping, Connected));
     }
+
+    [Fact]
+    public void Mirrored_monitors_are_detached_while_placing_and_listed_as_duplicates()
+    {
+        var desired = new[] { Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "ASUS") };
+
+        var plan = ApplyPlanner.Plan(desired, Connected);
+
+        Assert.Equal(["ASUS"], plan.Place.Select(p => p.Config.Key));
+        Assert.Contains(@"\\.\DISPLAY2", plan.DetachAdapters);
+        var duplicate = Assert.Single(plan.Duplicates);
+        Assert.Equal(("SAM", "ASUS"), (duplicate.Key, duplicate.ParentKey));
+    }
+
+    [Fact]
+    public void A_duplicate_of_a_monitor_that_is_not_connected_is_skipped_with_a_warning()
+    {
+        var desired = new[] { Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "GONE") };
+
+        var plan = ApplyPlanner.Plan(desired, Connected);
+
+        Assert.Empty(plan.Duplicates);
+        Assert.Contains(plan.Warnings, w => w.Contains("SAM"));
+    }
 }
 
 public class ProfileServiceTests : IDisposable
@@ -176,6 +200,50 @@ public class ProfileServiceTests : IDisposable
         Assert.Equal(profile.Monitors.Count, reloaded.Profiles.Single().Monitors.Count);
         Assert.Equal("Desk", reloaded.Profiles.Single().Name);
     }
+
+    [Fact]
+    public void Apply_mirrors_a_display_and_the_layout_is_captured_as_a_duplicate()
+    {
+        var fake = new FakeDisplayManager(Desk());
+        var service = Create(fake);
+        var mirrored = Profile.Create("Mirror", [Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "ASUS")]);
+
+        var result = service.Apply(mirrored);
+
+        Assert.True(result.Success);
+        var captured = service.CaptureLayout();
+        Assert.Equal("ASUS", captured.Single(m => m.Key == "SAM").DuplicateOf);
+        Assert.Equal(mirrored.Id, service.FindActiveProfile()?.Id ?? mirrored.Id);
+        Assert.True(LayoutMath.AreEquivalent(mirrored.Monitors, captured));
+    }
+
+    [Fact]
+    public void Existing_duplicates_are_broken_up_before_the_next_layout_is_applied()
+    {
+        var fake = new FakeDisplayManager(Desk());
+        var service = Create(fake);
+        service.Apply(Profile.Create("Mirror", [Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "ASUS")]));
+        Assert.Equal(0, fake.BreakDuplicatesCalls);
+
+        var result = service.Apply(Profile.Create("Extend", [Mon("ASUS", 0, 0, primary: true), Mon("SAM", 2560, 0)]));
+
+        Assert.True(result.Success);
+        Assert.Equal(1, fake.BreakDuplicatesCalls);
+        Assert.All(service.CaptureLayout().Where(m => m.Enabled), m => Assert.Null(m.DuplicateOf));
+    }
+
+    [Fact]
+    public void Apply_fails_and_reverts_when_a_display_never_mirrors()
+    {
+        var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 3 };
+        var service = Create(fake);
+        var mirrored = Profile.Create("Mirror", [Mon("ASUS", 0, 0, primary: true), Dup("SAM", of: "ASUS")]);
+
+        var result = service.Apply(mirrored);
+
+        Assert.False(result.Success);
+        Assert.Contains("duplicate", result.Error);
+    }
 }
 
 public class ProfileCyclerTests
@@ -209,4 +277,5 @@ public class HardwareIdTests
     [InlineData(@"MONITOR\AUS32A1\{4d36e96e-e325-11ce-bfc1-08002be10318}\0004", "AUS32A1")]
     public void Extracts_edid_hardware_id(string devicePath, string expected) =>
         Assert.Equal(expected, Win32DisplayManager.ExtractHardwareId(devicePath));
+
 }

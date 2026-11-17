@@ -27,4 +27,7 @@ public sealed record DisplayInfo
     public int RefreshHz { get; init; }
 
     public DisplayOrientation Orientation { get; init; }
+
+    /// <summary>Key of the display this one mirrors (duplicate mode), or null when it is its own part of the desktop.</summary>
+    public string? DuplicateOf { get; init; }
 }

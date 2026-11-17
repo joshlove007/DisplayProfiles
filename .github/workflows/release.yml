@@ -1,7 +1,8 @@
 name: Release
 
-# Push a tag such as v0.1.0-beta.1 (or run the workflow by hand) to build the app and the Game Bar widget and publish a
-# GitHub release. Tags with a "-" suffix (beta, rc...) are marked as pre-releases.
+# Push a tag such as v0.1.0-beta.1 (or run the workflow by hand) to build the app and the Game Bar widget as one MSIX per
+# architecture, sign them with Azure Artifact Signing and publish a GitHub release. Tags with a "-" suffix (beta, rc...) are
+# marked as pre-releases.
 on:
   push:
     tags: ['v*']
@@ -18,7 +19,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-    # Matches the Azure federated credential's subject (…:environment:release), which is what lets this job sign in.
+    # Matches the Azure federated credential's subject (...:environment:release), which is what lets this job sign in.
     environment: release
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -44,61 +45,18 @@ jobs:
       - name: Test
         run: dotnet test --solution DisplayProfiles.slnx --nologo
 
-      - name: Build the Game Bar widget
-        shell: pwsh
-        env:
-          PFX_BASE64: ${{ secrets.WIDGET_SIGNING_PFX_BASE64 }}
-          PFX_PASSWORD: ${{ secrets.WIDGET_SIGNING_PFX_PASSWORD }}
-        run: |
-          # The same self-signed certificate signs every release, so users only have to trust it once.
-          $bytes = [Convert]::FromBase64String($env:PFX_BASE64)
-          $pfx = Join-Path $env:RUNNER_TEMP 'widget.pfx'
-          [IO.File]::WriteAllBytes($pfx, $bytes)
-          Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My `
-            -Password (ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force) | Out-Null
-          Remove-Item $pfx
-
-          ./tools/Build-Widget.ps1
-
-          $package = Get-ChildItem artifacts/widget -Filter '*.msix' -Recurse | Select-Object -First 1
-          $cer = Get-ChildItem $package.Directory.FullName -Filter '*.cer' | Select-Object -First 1
-          $stage = 'widget-stage'
-          New-Item -ItemType Directory $stage | Out-Null
-          Copy-Item $package.FullName, $cer.FullName, tools/Install-Widget.ps1 $stage
-          Compress-Archive "$stage/*" "DisplayProfiles-GameBarWidget-${{ steps.version.outputs.full }}.zip" -CompressionLevel Optimal
-
-      - name: Publish app and build installers
+      # The Game Bar widget is a UWP app and needs Visual Studio's MSBuild. Its own (self-signed) signature is thrown away:
+      # only its files go into the combined package.
+      - name: Build the combined MSIX packages
         shell: pwsh
         run: |
-          choco install innosetup -y --no-progress | Out-Null
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          foreach ($rid in 'win-x64', 'win-arm64') {
-            $platform = if ($rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
-            dotnet publish src/DisplayProfiles.App/DisplayProfiles.App.csproj -c Release -r $rid "-p:Platform=$platform" `
-              -p:Version=${{ steps.version.outputs.full }} --nologo -v:minimal -o "publish/$rid"
-            if ($LASTEXITCODE -ne 0) { throw "publish failed for $rid" }
-            if (-not (Test-Path "publish/$rid/DisplayProfiles.pri")) { throw "DisplayProfiles.pri missing for $rid" }
-
-            # Portable zip
-            Compress-Archive "publish/$rid/*" "DisplayProfiles-${{ steps.version.outputs.full }}-$rid-portable.zip" -CompressionLevel Optimal
-
-            # Installer. Only the x64 one carries the Game Bar widget, which is built for x64.
-            $arch = $rid.Replace('win-', '')
-            $isccArgs = @('/Q', "/DAppVersion=${{ steps.version.outputs.full }}", "/DNumericVersion=${{ steps.version.outputs.number }}.0",
-              "/DArch=$arch", "/DSourceDir=..\publish\$rid")
-            if ($arch -eq 'x64') { $isccArgs += '/DWidgetDir=..\widget-stage' }
-            & $iscc @isccArgs installer/DisplayProfiles.iss
-            if ($LASTEXITCODE -ne 0) { throw "installer build failed for $arch" }
+          # The package version's last part is the run number so that every build installs over the previous one.
+          $version = "${{ steps.version.outputs.number }}.${{ github.run_number }}"
+          foreach ($platform in 'x64', 'ARM64') {
+            ./tools/Build-Widget.ps1 -Platform $platform
+            ./tools/Build-Package.ps1 -Platform $platform -SkipWidgetBuild -NoSign -Version $version `
+              -Publisher 'CN=Joshua Lovelace, O=Joshua Lovelace, L=Hendersonville, S=tn, C=US' -PublisherDisplayName 'Joshua Lovelace'
           }
-          Copy-Item artifacts/installer/*.exe .
-
-      # The app and the Game Bar widget in one MSIX. The publisher must equal the Artifact Signing certificate's subject.
-      # The package version's last part is the run number so that every build installs over the previous one.
-      - name: Build the combined MSIX
-        shell: pwsh
-        run: |
-          ./tools/Build-Package.ps1 -SkipWidgetBuild -NoSign -Version "${{ steps.version.outputs.number }}.${{ github.run_number }}" `
-            -Publisher 'CN=Joshua Lovelace, O=Joshua Lovelace, L=Hendersonville, S=tn, C=US' -PublisherDisplayName 'Joshua Lovelace'
 
       - name: Azure login
         uses: azure/login@v3
@@ -107,7 +65,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign the MSIX with Artifact Signing
+      - name: Sign the packages with Artifact Signing
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: https://eus.codesigning.azure.net/
@@ -119,14 +77,17 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Check the signature and name the file
+      - name: Check the signatures and name the files
         shell: pwsh
         run: |
-          $msix = Get-ChildItem artifacts/package -Filter '*.msix' | Select-Object -First 1
-          $signature = Get-AuthenticodeSignature $msix.FullName
-          "$($signature.Status): $($signature.SignerCertificate.Subject)"
-          if ($signature.Status -ne 'Valid') { throw "The MSIX signature is $($signature.Status): $($signature.StatusMessage)" }
-          Copy-Item $msix.FullName "DisplayProfiles-${{ steps.version.outputs.full }}-x64.msix"
+          foreach ($platform in 'x64', 'ARM64') {
+            $msix = Get-ChildItem artifacts/package -Filter "*_$platform.msix" | Select-Object -First 1
+            if (-not $msix) { throw "No $platform package was built." }
+            $signature = Get-AuthenticodeSignature $msix.FullName
+            "$platform : $($signature.Status): $($signature.SignerCertificate.Subject)"
+            if ($signature.Status -ne 'Valid') { throw "The $platform MSIX signature is $($signature.Status): $($signature.StatusMessage)" }
+            Copy-Item $msix.FullName "DisplayProfiles-${{ steps.version.outputs.full }}-$($platform.ToLower()).msix"
+          }
 
       - name: Create the release
         shell: pwsh
@@ -135,5 +96,5 @@ jobs:
         run: |
           $args = @('release', 'create', $env:TAG, '--title', "Display Profiles ${{ steps.version.outputs.full }}", '--generate-notes', '--verify-tag')
           if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
-          $args += (Get-ChildItem *.zip, DisplayProfiles-Setup-*.exe, DisplayProfiles-*.msix | ForEach-Object Name)
+          $args += (Get-ChildItem DisplayProfiles-*.msix | ForEach-Object Name)
           gh @args

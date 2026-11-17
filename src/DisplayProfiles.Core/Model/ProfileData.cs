@@ -38,7 +38,8 @@ public sealed record AppSettings
     /// <summary>Profile applied when the PC leaves Xbox mode.</summary>
     public Guid? XboxExitProfileId { get; init; }
 
-    public bool StartWithWindows { get; init; }
+    /// <summary>Start in the background when the user signs in. On by default so the app can react to Xbox mode.</summary>
+    public bool StartWithWindows { get; init; } = true;
 
     /// <summary>When the app switches to its large, controller-friendly look.</summary>
     public ControllerModePreference ControllerMode { get; init; } = ControllerModePreference.Auto;

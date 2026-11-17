@@ -219,6 +219,37 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         {
             Monitors[i].Number = i + 1;
         }
+
+        RefreshModeChoices();
+    }
+
+    /// <summary>
+    /// Rebuilds each display's "Multiple displays" options: extend, or duplicate one of the other displays that is on and
+    /// isn't itself a duplicate. A display that others duplicate can't be a duplicate itself.
+    /// </summary>
+    private void RefreshModeChoices()
+    {
+        bool previous = loading;
+        loading = true;
+        foreach (var monitor in all)
+        {
+            var labels = new List<string> { MonitorViewModel.ExtendLabel };
+            var targets = new List<string?> { null };
+            bool isOriginal = all.Any(m => m.DuplicateOf == monitor.Key && m.Enabled);
+            if (monitor.Enabled && !isOriginal)
+            {
+                foreach (var other in Monitors.Where(m => m != monitor && m.Enabled && !m.IsDuplicate))
+                {
+                    labels.Add($"Duplicate display {other.Number}");
+                    targets.Add(other.Key);
+                }
+            }
+
+            monitor.SetModeChoices(labels, targets, monitor.DuplicateOf);
+            monitor.DuplicateOfNumber = Monitors.FirstOrDefault(m => m.Key == monitor.DuplicateOf)?.Number ?? 0;
+        }
+
+        loading = previous;
     }
 
     /// <summary>Applies the "show disconnected displays" setting without touching unsaved edits.</summary>
@@ -273,9 +304,14 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
                 }
 
                 return;
+            case nameof(MonitorViewModel.ModeIndex):
+                OnModeChanged(monitor);
+                break;
             case nameof(MonitorViewModel.X) or nameof(MonitorViewModel.Y) or nameof(MonitorViewModel.Width) or nameof(MonitorViewModel.Height):
+                SyncDuplicates();
                 break;
             case nameof(MonitorViewModel.RefreshHz) or nameof(MonitorViewModel.OrientationIndex):
+                SyncDuplicates();
                 break;
             default:
                 return;
@@ -288,6 +324,14 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     private void OnEnabledChanged(MonitorViewModel monitor)
     {
         loading = true;
+
+        // A switched-off display can't be mirrored, and one that is switched on starts out as part of the extended desktop.
+        foreach (var dependent in all.Where(m => m.DuplicateOf == monitor.Key).ToList())
+        {
+            StopDuplicating(dependent);
+        }
+
+        monitor.DuplicateOf = null;
         if (monitor.Enabled)
         {
             // Put a newly enabled monitor to the right of the others.
@@ -313,13 +357,92 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             next.IsPrimary = true;
         }
 
-        if (!all.Any(m => m.Enabled && m.IsPrimary) && all.FirstOrDefault(m => m.Enabled) is { } first)
+        if (!all.Any(m => m.Enabled && m.IsPrimary) && all.FirstOrDefault(m => m.Enabled && !m.IsDuplicate) is { } first)
         {
             first.IsPrimary = true;
         }
 
         Renormalize();
+        RefreshModeChoices();
         loading = false;
+    }
+
+    /// <summary>The user picked "Extend" or "Duplicate display N" for a display.</summary>
+    private void OnModeChanged(MonitorViewModel monitor)
+    {
+        if (monitor.ModeIndex < 0 || monitor.ModeIndex >= monitor.ModeTargets.Count)
+        {
+            return;
+        }
+
+        string? target = monitor.ModeTargets[monitor.ModeIndex];
+        if (target == monitor.DuplicateOf)
+        {
+            return;
+        }
+
+        loading = true;
+        if (target is null)
+        {
+            StopDuplicating(monitor);
+        }
+        else if (all.FirstOrDefault(m => m.Key == target) is { } original)
+        {
+            // Remember the place and mode it had on the extended desktop, so "Extend" can bring them back.
+            monitor.OwnLayout ??= (monitor.X, monitor.Y, monitor.Width, monitor.Height, monitor.RefreshHz);
+            monitor.DuplicateOf = original.Key;
+            if (monitor.IsPrimary)
+            {
+                // The main display of the pair is the original one.
+                monitor.IsPrimary = false;
+                original.IsPrimary = true;
+            }
+        }
+
+        SyncDuplicates();
+        Renormalize();
+        RefreshModeChoices();
+        loading = false;
+    }
+
+    /// <summary>Takes a display back out of duplicate mode and puts it to the right of the rest, with the mode it had before.</summary>
+    private void StopDuplicating(MonitorViewModel monitor)
+    {
+        monitor.DuplicateOf = null;
+        if (monitor.OwnLayout is { } own)
+        {
+            monitor.SetMode(own.Width, own.Height, own.RefreshHz);
+            monitor.OwnLayout = null;
+        }
+        else
+        {
+            monitor.EnsureSupportedMode();
+        }
+
+        var others = all.Where(m => m.Enabled && m != monitor && !m.IsDuplicate).ToList();
+        if (others.Count > 0)
+        {
+            monitor.SetPosition(others.Max(m => m.X + m.Width), others.FirstOrDefault(m => m.IsPrimary)?.Y ?? 0);
+        }
+    }
+
+    /// <summary>A duplicate shows the same picture as its original, so it always has the original's place and mode.</summary>
+    private void SyncDuplicates()
+    {
+        bool previous = loading;
+        loading = true;
+        foreach (var duplicate in all.Where(m => m.DuplicateOf is not null))
+        {
+            if (all.FirstOrDefault(m => m.Key == duplicate.DuplicateOf) is { } original)
+            {
+                duplicate.SetPosition(original.X, original.Y);
+                duplicate.Width = original.Width;
+                duplicate.Height = original.Height;
+                duplicate.RefreshHz = original.RefreshHz;
+            }
+        }
+
+        loading = previous;
     }
 
     private void MakePrimary(MonitorViewModel monitor)
@@ -351,6 +474,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     /// <summary>Called by the canvas after a drag, with the final (snapped) positions already in the view models.</summary>
     public void NotifyMoved()
     {
+        SyncDuplicates();
         Renormalize();
         MarkDirty();
         LayoutChanged?.Invoke();
@@ -373,7 +497,12 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         loading = true;
         monitor.PropertyChanged -= OnMonitorChanged;
         all.Remove(monitor);
-        if (monitor.IsPrimary && all.FirstOrDefault(m => m.Enabled) is { } next)
+        foreach (var dependent in all.Where(m => m.DuplicateOf == monitor.Key).ToList())
+        {
+            StopDuplicating(dependent);
+        }
+
+        if (monitor.IsPrimary && all.FirstOrDefault(m => m.Enabled && !m.IsDuplicate) is { } next)
         {
             next.IsPrimary = true;
         }

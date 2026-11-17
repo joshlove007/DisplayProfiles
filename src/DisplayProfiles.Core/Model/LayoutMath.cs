@@ -7,6 +7,7 @@ public enum LayoutIssueKind
     NoResolution,
     Overlap,
     Disconnected,
+    Duplicate,
 }
 
 public sealed record LayoutIssue(LayoutIssueKind Kind, string Message);
@@ -28,7 +29,7 @@ public static class LayoutMath
     /// </summary>
     public static IReadOnlyList<(int X, int Y)> AttachSlots(MonitorConfig moving, IEnumerable<MonitorConfig> others)
     {
-        var targets = others.Where(o => o.Enabled && o.Key != moving.Key).ToList();
+        var targets = others.Where(o => o.Enabled && !o.IsDuplicate && o.Key != moving.Key).ToList();
         var slots = new HashSet<(int X, int Y)>();
 
         foreach (var o in targets)
@@ -95,7 +96,14 @@ public static class LayoutMath
             return monitors.Select(m => m with { IsPrimary = false }).ToList();
         }
 
-        var primary = enabled.FirstOrDefault(m => m.IsPrimary) ?? enabled[0];
+        // A duplicate follows the display it mirrors, so it never anchors the layout.
+        var placed = enabled.Where(m => !m.IsDuplicate).ToList();
+        if (placed.Count == 0)
+        {
+            return monitors.Select(m => m with { IsPrimary = false }).ToList();
+        }
+
+        var primary = placed.FirstOrDefault(m => m.IsPrimary) ?? placed[0];
         int dx = primary.X;
         int dy = primary.Y;
 
@@ -127,28 +135,38 @@ public static class LayoutMath
             return problems;
         }
 
-        if (enabled.Count(m => m.IsPrimary) != 1)
+        // Duplicates share their parent's place on the desktop, so only the other monitors take part in the geometry.
+        var placed = enabled.Where(m => !m.IsDuplicate).ToList();
+        foreach (var d in enabled.Where(m => m.IsDuplicate))
+        {
+            if (!placed.Any(p => p.Key == d.DuplicateOf))
+            {
+                problems.Add(new(LayoutIssueKind.Duplicate, $"{d.Name} duplicates a display that isn't switched on."));
+            }
+        }
+
+        if (placed.Count(m => m.IsPrimary) != 1)
         {
             problems.Add(new(LayoutIssueKind.PrimaryCount, "Exactly one enabled monitor must be the main display."));
         }
 
-        foreach (var m in enabled.Where(m => m.Width <= 0 || m.Height <= 0))
+        foreach (var m in placed.Where(m => m.Width <= 0 || m.Height <= 0))
         {
             problems.Add(new(LayoutIssueKind.NoResolution, $"{m.Name} has no resolution set."));
         }
 
-        for (int i = 0; i < enabled.Count; i++)
+        for (int i = 0; i < placed.Count; i++)
         {
-            for (int j = i + 1; j < enabled.Count; j++)
+            for (int j = i + 1; j < placed.Count; j++)
             {
-                if (Overlaps(enabled[i], enabled[j]))
+                if (Overlaps(placed[i], placed[j]))
                 {
-                    problems.Add(new(LayoutIssueKind.Overlap, $"{enabled[i].Name} and {enabled[j].Name} overlap."));
+                    problems.Add(new(LayoutIssueKind.Overlap, $"{placed[i].Name} and {placed[j].Name} overlap."));
                 }
             }
         }
 
-        if (enabled.Count > 1 && !IsConnected(enabled))
+        if (placed.Count > 1 && !IsConnected(placed))
         {
             problems.Add(new(LayoutIssueKind.Disconnected, "Every monitor must touch at least one other monitor."));
         }
@@ -182,7 +200,7 @@ public static class LayoutMath
     /// </summary>
     public static (int X, int Y) Snap(MonitorConfig moving, int proposedX, int proposedY, IEnumerable<MonitorConfig> others, int threshold)
     {
-        var candidates = others.Where(o => o.Enabled && o.Key != moving.Key).ToList();
+        var candidates = others.Where(o => o.Enabled && !o.IsDuplicate && o.Key != moving.Key).ToList();
         int x = proposedX;
         int y = proposedY;
         int bestDx = int.MaxValue;
@@ -223,7 +241,7 @@ public static class LayoutMath
     /// <summary>Moves the rectangle out of any overlap along the axis that needs the smallest push.</summary>
     public static (int X, int Y) ResolveOverlap(MonitorConfig moving, int x, int y, IEnumerable<MonitorConfig> others)
     {
-        foreach (var o in others.Where(o => o.Enabled && o.Key != moving.Key))
+        foreach (var o in others.Where(o => o.Enabled && !o.IsDuplicate && o.Key != moving.Key))
         {
             var probe = moving with { X = x, Y = y };
             if (!Overlaps(probe, o))
@@ -252,11 +270,15 @@ public static class LayoutMath
         return (x, y);
     }
 
-    /// <summary>Do two layouts describe the same desktop? Used to detect which profile is currently active.</summary>
+    /// <summary>
+    /// Do two layouts describe the same desktop? Used to detect which profile is currently active. Displays that mirror
+    /// each other are compared as a group: Windows doesn't say which one of two mirrored displays is the original, so the
+    /// direction ("A mirrors B" or "B mirrors A") doesn't matter.
+    /// </summary>
     public static bool AreEquivalent(IReadOnlyList<MonitorConfig> a, IReadOnlyList<MonitorConfig> b)
     {
-        var left = Normalize(a).Where(m => m.Enabled).OrderBy(m => m.Key, StringComparer.Ordinal).ToList();
-        var right = Normalize(b).Where(m => m.Enabled).OrderBy(m => m.Key, StringComparer.Ordinal).ToList();
+        var left = Groups(a);
+        var right = Groups(b);
 
         if (left.Count != right.Count)
         {
@@ -265,11 +287,11 @@ public static class LayoutMath
 
         for (int i = 0; i < left.Count; i++)
         {
-            var l = left[i];
-            var r = right[i];
+            var (leftMembers, l) = left[i];
+            var (rightMembers, r) = right[i];
             // Windows reports 59.94 Hz modes as 59 and asks for 60, so allow a 1 Hz difference.
             bool sameRefresh = l.RefreshHz == 0 || r.RefreshHz == 0 || Math.Abs(l.RefreshHz - r.RefreshHz) <= 1;
-            if (l.Key != r.Key || l.IsPrimary != r.IsPrimary || l.X != r.X || l.Y != r.Y ||
+            if (leftMembers != rightMembers || l.IsPrimary != r.IsPrimary || l.X != r.X || l.Y != r.Y ||
                 l.Width != r.Width || l.Height != r.Height || l.Orientation != r.Orientation || !sameRefresh)
             {
                 return false;
@@ -277,5 +299,20 @@ public static class LayoutMath
         }
 
         return true;
+    }
+
+    // One entry per part of the desktop: the keys of the displays showing it, and the display that carries its place and mode.
+    private static List<(string Members, MonitorConfig Root)> Groups(IReadOnlyList<MonitorConfig> monitors)
+    {
+        var enabled = Normalize(monitors).Where(m => m.Enabled).ToList();
+        var roots = enabled.Where(m => !m.IsDuplicate || enabled.All(o => o.Key != m.DuplicateOf)).ToList();
+        return [.. roots
+            .Select(root => (
+                Members: string.Join('|', enabled
+                    .Where(m => m.Key == root.Key || (m.IsDuplicate && m.DuplicateOf == root.Key))
+                    .Select(m => m.Key)
+                    .Order(StringComparer.Ordinal)),
+                Root: root))
+            .OrderBy(g => g.Members, StringComparer.Ordinal)];
     }
 }

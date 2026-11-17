@@ -11,6 +11,7 @@ public sealed partial class MonitorViewModel : ObservableObject
     private static readonly string[] OrientationNames = ["Landscape", "Portrait", "Landscape (flipped)", "Portrait (flipped)"];
 
     private readonly List<DisplayMode> modes;
+    private readonly List<DisplayMode> supported;
     private List<(int Width, int Height)> resolutions = [];
     private bool loading = true;
 
@@ -21,6 +22,7 @@ public sealed partial class MonitorViewModel : ObservableObject
         Number = number;
         IsConnected = isConnected;
         modes = [.. supportedModes];
+        supported = [.. supportedModes];
 
         // A monitor that isn't connected right now still shows the mode saved in the profile.
         if (config.Width > 0 && !modes.Contains(new DisplayMode(config.Width, config.Height, config.RefreshHz)))
@@ -39,6 +41,7 @@ public sealed partial class MonitorViewModel : ObservableObject
         Height = config.Height;
         RefreshHz = config.RefreshHz;
         OrientationIndex = (int)config.Orientation;
+        DuplicateOf = config.DuplicateOf;
         ResolutionIndex = resolutions.FindIndex(r => r == (config.Width, config.Height));
         RebuildRefreshRates();
 
@@ -99,11 +102,43 @@ public sealed partial class MonitorViewModel : ObservableObject
     [ObservableProperty]
     public partial int OrientationIndex { get; set; }
 
+    /// <summary>Key of the display this one mirrors (duplicate mode), or null when it extends the desktop.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDuplicate))]
+    [NotifyPropertyChangedFor(nameof(IsExtended))]
+    [NotifyPropertyChangedFor(nameof(Summary))]
+    public partial string? DuplicateOf { get; set; }
+
+    public bool IsDuplicate => DuplicateOf is not null;
+
+    public bool IsExtended => DuplicateOf is null;
+
+    /// <summary>The number shown for the display this one mirrors, for the summary.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Summary))]
+    public partial int DuplicateOfNumber { get; set; }
+
+    /// <summary>The options of the "Multiple displays" setting: extend, or duplicate one of the other displays.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<string> ModeChoices { get; set; } = [ExtendLabel];
+
+    [ObservableProperty]
+    public partial int ModeIndex { get; set; }
+
+    /// <summary>For each entry of <see cref="ModeChoices"/>, the key of the display it duplicates (null = extend).</summary>
+    public IReadOnlyList<string?> ModeTargets { get; private set; } = [null];
+
+    public const string ExtendLabel = "Extend desktop to this display";
+
+    /// <summary>The mode, place and size this display had as part of the extended desktop, kept while it is a duplicate.</summary>
+    public (int X, int Y, int Width, int Height, int RefreshHz)? OwnLayout { get; set; }
     public string Title => $"{Number}. {Name}";
 
     public string Summary => !Enabled
         ? (IsConnected ? "Off" : "Off · not connected")
-        : $"{Width} × {Height}, {RefreshHz} Hz{(IsPrimary ? " · Main display" : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
+        : IsDuplicate
+            ? $"Duplicating display {DuplicateOfNumber}{(IsConnected ? string.Empty : " · not connected")}"
+            : $"{Width} × {Height}, {RefreshHz} Hz{(IsPrimary ? " · Main display" : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
 
     public MonitorConfig ToConfig() => new()
     {
@@ -117,7 +152,43 @@ public sealed partial class MonitorViewModel : ObservableObject
         Height = Height,
         RefreshHz = RefreshHz,
         Orientation = (DisplayOrientation)OrientationIndex,
+        DuplicateOf = Enabled ? DuplicateOf : null,
     };
+
+    /// <summary>Replaces the options of the "Multiple displays" setting, keeping <paramref name="selectedKey"/> selected.</summary>
+    public void SetModeChoices(IReadOnlyList<string> labels, IReadOnlyList<string?> targets, string? selectedKey)
+    {
+        ModeChoices = labels;
+        ModeTargets = targets;
+        ModeIndex = Math.Max(0, targets.ToList().IndexOf(selectedKey));
+    }
+
+    /// <summary>
+    /// A display that was a duplicate has its original's mode, which it may not support. Switches to its best mode then.
+    /// </summary>
+    public void EnsureSupportedMode()
+    {
+        if (!IsConnected || supported.Count == 0 || supported.Contains(new DisplayMode(Width, Height, RefreshHz)))
+        {
+            return;
+        }
+
+        var best = supported.OrderByDescending(m => (long)m.Width * m.Height).ThenByDescending(m => m.RefreshHz).First();
+        SetMode(best.Width, best.Height, best.RefreshHz);
+    }
+
+    /// <summary>Sets the mode of the display (for example when it stops being a duplicate), keeping the pickers in step.</summary>
+    public void SetMode(int width, int height, int refreshHz)
+    {
+        bool previous = loading;
+        loading = true;
+        Width = width;
+        Height = height;
+        RefreshHz = refreshHz;
+        ResolutionIndex = resolutions.FindIndex(r => r == (width, height));
+        RebuildRefreshRates();
+        loading = previous;
+    }
 
     /// <summary>Moves the monitor without raising per-property edits from the editor's point of view.</summary>
     public void SetPosition(int x, int y)

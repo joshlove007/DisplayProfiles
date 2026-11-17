@@ -1,14 +1,19 @@
 <#
 .SYNOPSIS
-    Installs the DisplayProfiles Game Bar widget built by Build-Widget.ps1.
+    Installs a locally built, self-signed DisplayProfiles package: the Game Bar widget from Build-Widget.ps1, or the
+    combined app and widget package from Build-Package.ps1 (pass it with -Package).
 
 .DESCRIPTION
     Trusts the package's self-signed certificate (this needs administrator rights, so the script asks for them once)
-    and installs the MSIX for the current user. Use -Uninstall to remove the widget again.
+    and installs the MSIX for the current user. Use -Uninstall to remove the widget and the combined package again.
+    Released packages are signed by Microsoft's Artifact Signing and don't need any of this.
 #>
 [CmdletBinding()]
 param(
-    [switch]$Uninstall
+    [switch]$Uninstall,
+
+    # The .msix to install, with its .cer next to it. Default: the newest widget package under artifacts\widget.
+    [string]$Package
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,7 +24,8 @@ Get-AppxPackage 'MonitorToggle.GameBarWidget' | Remove-AppxPackage -ErrorAction 
 
 if ($Uninstall) {
     Get-AppxPackage $packageName | Remove-AppxPackage
-    Write-Host 'Widget removed.' -ForegroundColor Green
+    Get-AppxPackage 'DisplayProfiles' | Remove-AppxPackage
+    Write-Host 'Removed.' -ForegroundColor Green
     return
 }
 
@@ -27,14 +33,30 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 
 # From a release download the package sits next to this script; from a source checkout it is in artifacts\widget.
 $searchRoots = @($PSScriptRoot, (Join-Path $repoRoot 'artifacts\widget')) | Where-Object { Test-Path $_ }
-$msix = foreach ($root in $searchRoots) {
-    $found = Get-ChildItem $root -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($found) { $found; break }
+$msix = if ($Package) {
+    Get-Item $Package
+}
+else {
+    foreach ($root in $searchRoots) {
+        $found = Get-ChildItem $root -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($found) { $found; break }
+    }
 }
 if (-not $msix) { throw 'No .msix found next to this script or in artifacts\widget. Run tools\Build-Widget.ps1 first.' }
-$cer = Get-ChildItem $msix.Directory.FullName -Filter '*.cer' | Select-Object -First 1
+$cer = Get-ChildItem $msix.Directory.FullName -Filter "$($msix.BaseName).cer" | Select-Object -First 1
+if (-not $cer) { $cer = Get-ChildItem $msix.Directory.FullName -Filter '*.cer' | Select-Object -First 1 }
 if (-not $cer) { throw "No .cer next to $($msix.Name)." }
+
+# The package's own name (the widget package and the combined package differ).
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [IO.Compression.ZipFile]::OpenRead($msix.FullName)
+try {
+    $reader = New-Object IO.StreamReader($zip.GetEntry('AppxManifest.xml').Open())
+    $packageName = ([xml]$reader.ReadToEnd()).Package.Identity.Name
+    $reader.Close()
+}
+finally { $zip.Dispose() }
 
 $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $cer.FullName
 $trusted = Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Thumbprint -eq $certificate.Thumbprint
