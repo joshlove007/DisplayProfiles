@@ -95,6 +95,13 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
 
     public void Apply(ApplyPlan plan)
     {
+        if (plan.Duplicates.Count > 0)
+        {
+            // The topology (which displays are on, and which of them show the same picture) comes first; the desktop
+            // positions and modes are set afterwards, on what it produced.
+            plan = ArrangeDuplicates(plan);
+        }
+
         foreach (var placement in plan.Place)
         {
             Place(placement.AdapterName, placement.Config);
@@ -109,13 +116,6 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
         if (result != DISP_CHANGE.DISP_CHANGE_SUCCESSFUL)
         {
             throw new DisplayApplyException($"Windows could not apply the display settings ({Describe(result)}).");
-        }
-
-        if (plan.Duplicates.Count > 0)
-        {
-            // Let the new layout settle so the display configuration describes it.
-            Thread.Sleep(1000);
-            Mirror(plan.Duplicates);
         }
     }
 
@@ -418,19 +418,107 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
     }
 
     /// <summary>
-    /// Makes each planned duplicate share the source (the picture) of the display it mirrors, by rewriting the display
-    /// paths: the duplicate's own path is dropped and a path to the same monitor on the original's source is added.
+    /// Sets up the topology for a plan with duplicates. Windows can only describe a duplicate that spans graphics adapters
+    /// (a TV on the graphics card next to monitors on the processor's graphics) through the "virtual" paths it creates
+    /// itself when it clones, so this asks Windows to clone every display and then keeps only the paths that are wanted:
+    /// each group of displays that show the same picture shares one source, every other display gets a source of its own,
+    /// and displays that are not in the plan are left out (switched off). Returns the plan with the adapter names that are
+    /// valid afterwards, and nothing left to detach.
     /// </summary>
-    private static void Mirror(IReadOnlyList<PlannedDuplicate> duplicates)
+    private static ApplyPlan ArrangeDuplicates(ApplyPlan plan)
     {
-        var (active, modes) = QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS);
+        // Keys come from before the clone, while every monitor is still listed on its own.
+        var keyByPath = KeysByDevicePath();
+        string? KeyOf(DISPLAYCONFIG_PATH_TARGET_INFO target) =>
+            TryGetTargetName(target.adapterId, target.id, out string devicePath, out _) && keyByPath.TryGetValue(devicePath, out var key)
+                ? key
+                : null;
+
+        var result = PInvoke.SetDisplayConfig([], [], SET_DISPLAY_CONFIG_FLAGS.SDC_APPLY | SET_DISPLAY_CONFIG_FLAGS.SDC_TOPOLOGY_CLONE);
+        if (result != 0)
+        {
+            throw new DisplayApplyException($"Windows could not set up the duplicate displays (error {result}).");
+        }
+
+        Thread.Sleep(3000);
         var all = QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS).Paths;
 
-        // After a mirror Windows' monitor list can be missing the very monitors being set up, so the keys come from the
-        // display configuration itself; where the list does know a monitor, its key is used (they can differ for
-        // identical monitors).
+        // Every part of the desktop: a display with the displays that mirror it.
+        var units = plan.Place
+            .Select(p => (Keys: new[] { p.Config.Key }
+                .Concat(plan.Duplicates.Where(d => d.ParentKey == p.Config.Key).Select(d => d.Key)).ToList(), Placement: p))
+            .Select(u => (u.Keys, u.Placement, Options: SourcesOfferedForAll(u.Keys, all, KeyOf)))
+            .OrderBy(u => u.Options.Count)
+            .ToList();
+
+        var used = new HashSet<(uint Low, int High, uint Id)>();
+        var chosen = new List<DISPLAYCONFIG_PATH_INFO>();
+        foreach (var unit in units)
+        {
+            var source = unit.Options.FirstOrDefault(s => !used.Contains(s));
+            if (source == default)
+            {
+                throw new DisplayApplyException(
+                    $"Windows can't set up {string.Join(" and ", unit.Keys)} as requested: it doesn't offer a free output for it.");
+            }
+
+            used.Add(source);
+            foreach (string key in unit.Keys)
+            {
+                var path = all.First(p => KeyOf(p.targetInfo) == key &&
+                    (p.sourceInfo.adapterId.LowPart, p.sourceInfo.adapterId.HighPart, p.sourceInfo.id) == source);
+                path.flags |= PathActive;
+                path.sourceInfo.Anonymous.modeInfoIdx = ModeIndexInvalid;
+                path.targetInfo.Anonymous.modeInfoIdx = ModeIndexInvalid;
+                chosen.Add(path);
+            }
+        }
+
+        result = PInvoke.SetDisplayConfig(
+            chosen.ToArray(),
+            [],
+            SET_DISPLAY_CONFIG_FLAGS.SDC_APPLY | SET_DISPLAY_CONFIG_FLAGS.SDC_USE_SUPPLIED_DISPLAY_CONFIG |
+            SET_DISPLAY_CONFIG_FLAGS.SDC_ALLOW_CHANGES | SET_DISPLAY_CONFIG_FLAGS.SDC_SAVE_TO_DATABASE);
+        if (result != 0)
+        {
+            throw new DisplayApplyException($"Windows could not duplicate the displays (error {result}).");
+        }
+
+        Thread.Sleep(2000);
+
+        // The adapter names can have changed with the topology.
+        var adapterByKey = Snapshot().ToDictionary(s => s.Info.Key, s => s.Info.AdapterName, StringComparer.Ordinal);
+        var place = plan.Place
+            .Select(p => adapterByKey.TryGetValue(p.Config.Key, out string? adapter) && adapter.Length > 0
+                ? p with { AdapterName = adapter }
+                : throw new DisplayApplyException($"{p.Config.Name} is no longer available after changing the display setup."))
+            .ToList();
+        return plan with { Place = place, DetachAdapters = [] };
+    }
+
+    // The sources (picture outputs) that every one of the displays has a path to, so they can all show that picture.
+    private static List<(uint Low, int High, uint Id)> SourcesOfferedForAll(
+        List<string> keys, DISPLAYCONFIG_PATH_INFO[] all, Func<DISPLAYCONFIG_PATH_TARGET_INFO, string?> keyOf)
+    {
+        IEnumerable<(uint Low, int High, uint Id)>? common = null;
+        foreach (string key in keys)
+        {
+            var sources = all
+                .Where(p => keyOf(p.targetInfo) == key)
+                .Select(p => (p.sourceInfo.adapterId.LowPart, p.sourceInfo.adapterId.HighPart, p.sourceInfo.id))
+                .Distinct();
+            common = common is null ? sources : common.Intersect(sources);
+        }
+
+        return [.. common ?? []];
+    }
+
+    // Keys for every monitor path the display configuration knows. Where Windows' monitor list knows the monitor, its key is
+    // used (keys can differ for identical monitors); the rest, such as a monitor missing from that list, are numbered the same way.
+    private static Dictionary<string, string> KeysByDevicePath()
+    {
         var devicePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var path in active.Concat(all))
+        foreach (var path in QueryConfig(QUERY_DISPLAY_CONFIG_FLAGS.QDC_ALL_PATHS).Paths)
         {
             if (TryGetTargetName(path.targetInfo.adapterId, path.targetInfo.id, out string devicePath, out _))
             {
@@ -447,53 +535,7 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             keyByPath[path] = info.Key;
         }
 
-        string? KeyOf(DISPLAYCONFIG_PATH_TARGET_INFO target) =>
-            TryGetTargetName(target.adapterId, target.id, out string devicePath, out _) && keyByPath.TryGetValue(devicePath, out var key)
-                ? key
-                : null;
-
-        var paths = active.ToList();
-
-        foreach (var duplicate in duplicates)
-        {
-            paths.RemoveAll(p => KeyOf(p.targetInfo) == duplicate.Key);
-            int parentAt = paths.FindIndex(p => KeyOf(p.targetInfo) == duplicate.ParentKey);
-            if (parentAt < 0)
-            {
-                throw new DisplayApplyException($"{duplicate.ParentName} isn't switched on, so {duplicate.Name} can't duplicate it.");
-            }
-
-            var parent = paths[parentAt];
-
-            // The monitor has to be reachable from the graphics output that draws the original.
-            var candidate = all
-                .Where(p => KeyOf(p.targetInfo) == duplicate.Key &&
-                    p.sourceInfo.adapterId.LowPart == parent.sourceInfo.adapterId.LowPart &&
-                    p.sourceInfo.adapterId.HighPart == parent.sourceInfo.adapterId.HighPart)
-                .Select(p => (DISPLAYCONFIG_PATH_INFO?)p)
-                .FirstOrDefault();
-            if (candidate is not { } mirrorPath)
-            {
-                throw new DisplayApplyException(
-                    $"{duplicate.Name} can't duplicate {duplicate.ParentName}: Windows can't drive both from the same graphics output.");
-            }
-
-            mirrorPath.sourceInfo.id = parent.sourceInfo.id;
-            mirrorPath.sourceInfo.Anonymous = parent.sourceInfo.Anonymous;
-            mirrorPath.targetInfo.Anonymous.modeInfoIdx = ModeIndexInvalid;
-            mirrorPath.flags |= PathActive;
-            paths.Add(mirrorPath);
-        }
-
-        var result = PInvoke.SetDisplayConfig(
-            paths.ToArray(),
-            modes,
-            SET_DISPLAY_CONFIG_FLAGS.SDC_APPLY | SET_DISPLAY_CONFIG_FLAGS.SDC_USE_SUPPLIED_DISPLAY_CONFIG |
-            SET_DISPLAY_CONFIG_FLAGS.SDC_ALLOW_CHANGES | SET_DISPLAY_CONFIG_FLAGS.SDC_SAVE_TO_DATABASE);
-        if (result != 0)
-        {
-            throw new DisplayApplyException($"Windows could not duplicate the displays (error {result}).");
-        }
+        return keyByPath;
     }
     // Windows labels the two portrait modes the other way round from the raw DMDO angles.
     private static DEVMODE_DISPLAY_ORIENTATION ToDmdo(DisplayOrientation o) => o switch

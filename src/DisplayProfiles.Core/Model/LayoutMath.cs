@@ -235,7 +235,118 @@ public static class LayoutMath
             y += bestDy;
         }
 
-        return ResolveOverlap(moving, x, y, candidates);
+        var resolved = ResolveOverlap(moving, x, y, candidates);
+
+        // Like Windows' display settings, never leave a monitor floating: it always ends up against another one.
+        if (candidates.Count > 0 && !candidates.Any(o => Touches(moving with { X = resolved.X, Y = resolved.Y }, o)))
+        {
+            return NearestSlot(moving, resolved, candidates) ?? resolved;
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// Where a dragged monitor ends up and which other monitors move (all of them as absolute positions). <c>Marker</c> is the
+    /// edge a monitor would be inserted at, in the layout as it is now, when it is dropped between monitors.
+    /// </summary>
+    public sealed record MovePlan(int X, int Y, IReadOnlyList<(string Key, int X, int Y)> Shifts, (int X, int Y, int Width, int Height)? Marker = null);
+
+    /// <summary>
+    /// Plans a drag like Windows' display settings does. Dropped next to the others, the monitor snaps to them. Dropped on
+    /// top of one (its centre over that monitor), it is inserted before or after it, depending on which side the centre is
+    /// on. The gap it leaves behind is closed first and the monitors beyond the insertion point move along, so a monitor
+    /// can be moved between two others without the rest of the layout jumping.
+    /// </summary>
+    public static MovePlan PlanMove(MonitorConfig moving, int proposedX, int proposedY, IEnumerable<MonitorConfig> others, int threshold)
+    {
+        var candidates = others.Where(o => o.Enabled && !o.IsDuplicate && o.Key != moving.Key).ToList();
+        double centerX = proposedX + (moving.Width / 2.0);
+        double centerY = proposedY + (moving.Height / 2.0);
+        var target = candidates.FirstOrDefault(o => centerX >= o.X && centerX < o.Right && centerY >= o.Y && centerY < o.Bottom);
+        if (target is null)
+        {
+            var (x, y) = Snap(moving, proposedX, proposedY, candidates, threshold);
+            return new MovePlan(x, y, []);
+        }
+
+        double offsetX = (centerX - (target.X + (target.Width / 2.0))) / target.Width;
+        double offsetY = (centerY - (target.Y + (target.Height / 2.0))) / target.Height;
+        bool horizontal = Math.Abs(offsetX) >= Math.Abs(offsetY);
+        bool before = (horizontal ? offsetX : offsetY) < 0;
+
+        // The layout without the moving monitor, with the gap it left closed.
+        var closed = CloseGaps(candidates).ToDictionary(m => m.Key);
+        var t = closed[target.Key];
+        int newX = horizontal ? (before ? t.X : t.Right) : t.X;
+        int newY = horizontal ? t.Y : (before ? t.Y : t.Bottom);
+        int edge = horizontal ? newX : newY;
+
+        var final = closed.Values.Select(m =>
+            (horizontal ? m.X : m.Y) >= edge
+                ? (m.Key, X: m.X + (horizontal ? moving.Width : 0), Y: m.Y + (horizontal ? 0 : moving.Height))
+                : (m.Key, m.X, m.Y)).ToList();
+        var shifts = final
+            .Where(f => candidates.First(c => c.Key == f.Key) is var c && (c.X != f.X || c.Y != f.Y))
+            .ToList();
+
+        var marker = horizontal
+            ? (before ? target.X : target.Right, target.Y, 0, target.Height)
+            : (target.X, before ? target.Y : target.Bottom, target.Width, 0);
+        return new MovePlan(newX, newY, shifts, marker);
+    }
+    private static (int X, int Y)? NearestSlot(MonitorConfig moving, (int X, int Y) from, IReadOnlyList<MonitorConfig> others)
+    {
+        var slots = AttachSlots(moving, others);
+        return slots.Count == 0
+            ? null
+            : slots.OrderBy(s => Math.Pow(s.X - from.X, 2) + Math.Pow(s.Y - from.Y, 2)).First();
+    }
+
+    /// <summary>
+    /// Pulls monitors that don't touch the rest of the layout (a gap left by a monitor that was switched off, moved or
+    /// became a duplicate) against it, so the layout is always one connected piece, as Windows requires. Duplicates are ignored.
+    /// </summary>
+    public static IReadOnlyList<MonitorConfig> CloseGaps(IReadOnlyList<MonitorConfig> monitors)
+    {
+        var result = monitors.ToList();
+        var placed = result.Where(m => m.Enabled && !m.IsDuplicate).ToList();
+        if (placed.Count < 2)
+        {
+            return result;
+        }
+
+        var anchor = placed.FirstOrDefault(m => m.IsPrimary) ?? placed[0];
+        var connected = new List<MonitorConfig> { anchor };
+        var pending = placed.Where(m => m.Key != anchor.Key).ToList();
+        while (pending.Count > 0)
+        {
+            // Take whatever already touches the group; otherwise move the closest one against it.
+            var touching = pending.FirstOrDefault(p => connected.Any(c => Touches(p, c)));
+            if (touching is not null)
+            {
+                connected.Add(touching);
+                pending.Remove(touching);
+                continue;
+            }
+
+            var best = pending
+                .Select(p => (Monitor: p, Slot: NearestSlot(p, (p.X, p.Y), connected)))
+                .Where(x => x.Slot is not null)
+                .OrderBy(x => Math.Pow(x.Slot!.Value.X - x.Monitor.X, 2) + Math.Pow(x.Slot!.Value.Y - x.Monitor.Y, 2))
+                .FirstOrDefault();
+            if (best.Monitor is null)
+            {
+                break;
+            }
+
+            var moved = best.Monitor with { X = best.Slot!.Value.X, Y = best.Slot!.Value.Y };
+            result[result.FindIndex(m => m.Key == moved.Key)] = moved;
+            connected.Add(moved);
+            pending.RemoveAll(p => p.Key == moved.Key);
+        }
+
+        return result;
     }
 
     /// <summary>Moves the rectangle out of any overlap along the axis that needs the smallest push.</summary>

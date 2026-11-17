@@ -10,8 +10,9 @@ public sealed partial class MonitorViewModel : ObservableObject
 {
     private static readonly string[] OrientationNames = ["Landscape", "Portrait", "Landscape (flipped)", "Portrait (flipped)"];
 
-    private readonly List<DisplayMode> modes;
+    private readonly List<DisplayMode> allModes;
     private readonly List<DisplayMode> supported;
+    private List<DisplayMode> modes;
     private List<(int Width, int Height)> resolutions = [];
     private bool loading = true;
 
@@ -30,6 +31,7 @@ public sealed partial class MonitorViewModel : ObservableObject
             modes.Add(new DisplayMode(config.Width, config.Height, config.RefreshHz));
         }
 
+        allModes = [.. modes];
         resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => (long)r.Width * r.Height)];
         ResolutionLabels = [.. resolutions.Select(r => $"{r.Width} × {r.Height}")];
 
@@ -62,7 +64,8 @@ public sealed partial class MonitorViewModel : ObservableObject
     /// <summary>Only a display that isn't connected can be removed from the profile.</summary>
     public bool CanRemove => !IsConnected;
 
-    public IReadOnlyList<string> ResolutionLabels { get; }
+    [ObservableProperty]
+    public partial IReadOnlyList<string> ResolutionLabels { get; set; }
 
     public IReadOnlyList<string> Orientations => OrientationNames;
 
@@ -113,20 +116,27 @@ public sealed partial class MonitorViewModel : ObservableObject
 
     public bool IsExtended => DuplicateOf is null;
 
-    /// <summary>The number shown for the display this one mirrors, for the summary.</summary>
+    /// <summary>For a display that shows the same picture as others: "Duplicating display 3" (empty otherwise).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Summary))]
-    public partial int DuplicateOfNumber { get; set; }
+    public partial string GroupNote { get; set; } = string.Empty;
 
-    /// <summary>The options of the "Multiple displays" setting: extend, or duplicate one of the other displays.</summary>
+    /// <summary>True when this display shares its picture with others, as the original or as a duplicate.</summary>
+    [ObservableProperty]
+    public partial bool InGroup { get; set; }
+
+    /// <summary>The options of the "Display mode" setting: extend, or duplicate other displays.</summary>
     [ObservableProperty]
     public partial IReadOnlyList<string> ModeChoices { get; set; } = [ExtendLabel];
 
     [ObservableProperty]
     public partial int ModeIndex { get; set; }
 
-    /// <summary>For each entry of <see cref="ModeChoices"/>, the key of the display it duplicates (null = extend).</summary>
+    /// <summary>For each entry of <see cref="ModeChoices"/>: the key of the display to duplicate, null to extend, or <see cref="KeepGroup"/>.</summary>
     public IReadOnlyList<string?> ModeTargets { get; private set; } = [null];
+
+    /// <summary>The entry of a display that already shares its picture, which names the other displays of the group.</summary>
+    public const string KeepGroup = "\0keep";
 
     public const string ExtendLabel = "Extend desktop to this display";
 
@@ -136,16 +146,14 @@ public sealed partial class MonitorViewModel : ObservableObject
 
     public string Summary => !Enabled
         ? (IsConnected ? "Off" : "Off · not connected")
-        : IsDuplicate
-            ? $"Duplicating display {DuplicateOfNumber}{(IsConnected ? string.Empty : " · not connected")}"
-            : $"{Width} × {Height}, {RefreshHz} Hz{(IsPrimary ? " · Main display" : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
+        : $"{Width} × {Height}, {RefreshHz} Hz{(IsPrimary ? " · Main display" : string.Empty)}{(GroupNote.Length > 0 ? " · " + GroupNote : string.Empty)}{(IsConnected ? string.Empty : " · not connected")}";
 
     public MonitorConfig ToConfig() => new()
     {
         Key = Key,
         Name = Name,
         Enabled = Enabled,
-        IsPrimary = Enabled && IsPrimary,
+        IsPrimary = Enabled && IsPrimary && !IsDuplicate,
         X = X,
         Y = Y,
         Width = Width,
@@ -175,6 +183,55 @@ public sealed partial class MonitorViewModel : ObservableObject
 
         var best = supported.OrderByDescending(m => (long)m.Width * m.Height).ThenByDescending(m => m.RefreshHz).First();
         SetMode(best.Width, best.Height, best.RefreshHz);
+    }
+
+    /// <summary>
+    /// The modes this display supports (or, for a display that isn't connected, the one saved in the profile). The modes
+    /// a group of mirrored displays can use are the ones all of its displays support.
+    /// </summary>
+    public IReadOnlyList<DisplayMode> SupportedModes => IsConnected && supported.Count > 0 ? supported : allModes;
+
+    /// <summary>
+    /// Limits the resolutions and refresh rates on offer to <paramref name="limit"/> (null = everything the display
+    /// supports). If the current mode isn't among them, the best one that is takes its place. Returns true if the mode changed.
+    /// </summary>
+    public bool LimitModes(IReadOnlyList<DisplayMode>? limit)
+    {
+        var wanted = limit is null ? [.. allModes] : allModes.Where(limit.Contains).ToList();
+        if (wanted.Count == 0)
+        {
+            wanted = [.. allModes];
+        }
+
+        modes = wanted;
+        resolutions = [.. modes.Select(m => (m.Width, m.Height)).Distinct().OrderByDescending(r => (long)r.Width * r.Height)];
+
+        bool previous = loading;
+        loading = true;
+        ResolutionLabels = [.. resolutions.Select(r => $"{r.Width} × {r.Height}")];
+        loading = previous;
+
+        bool sideways = OrientationIndex is 1 or 3;
+        var current = new DisplayMode(Width, Height, RefreshHz);
+        if (sideways || modes.Contains(current))
+        {
+            SetMode(Width, Height, RefreshHz);
+            return false;
+        }
+
+        var best = modes.OrderByDescending(m => (long)m.Width * m.Height).ThenByDescending(m => m.RefreshHz).First();
+        SetMode(best.Width, best.Height, best.RefreshHz);
+        return true;
+    }
+
+    /// <summary>Takes over the mode and orientation of another display of the same group, without the usual side effects.</summary>
+    public void CopyModeFrom(MonitorViewModel other)
+    {
+        bool previous = loading;
+        loading = true;
+        OrientationIndex = other.OrientationIndex;
+        loading = previous;
+        SetMode(other.Width, other.Height, other.RefreshHz);
     }
 
     /// <summary>Sets the mode of the display (for example when it stops being a duplicate), keeping the pickers in step.</summary>

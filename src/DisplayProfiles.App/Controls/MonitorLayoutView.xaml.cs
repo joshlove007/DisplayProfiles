@@ -33,6 +33,8 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
     private Point dragStart;
     private (int X, int Y) dragStartPosition;
     private (int X, int Y) dragCurrent;
+    private LayoutMath.MovePlan? dragPlan;
+    private Microsoft.UI.Xaml.Shapes.Rectangle? marker;
 
     private MonitorViewModel? grabbed;
     private (int X, int Y) grabStart;
@@ -105,7 +107,7 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
         foreach (var monitor in enabled)
         {
             var mirrored = editor.Monitors.Where(m => m.Enabled && m.DuplicateOf == monitor.Key).OrderBy(m => m.Number).ToList();
-            string label = string.Join(" | ", new[] { monitor.Number }.Concat(mirrored.Select(m => m.Number))
+            string label = string.Join("|", new[] { monitor.Number }.Concat(mirrored.Select(m => m.Number)).Order()
                 .Select(n => n.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             var number = new TextBlock
             {
@@ -120,10 +122,10 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
                 Content = number,
                 Tag = monitor,
             };
-            string names = string.Join(" and ", new[] { monitor.Name }.Concat(mirrored.Select(m => m.Name)));
+            string names = string.Join(" and ", mirrored.Append(monitor).OrderBy(m => m.Number).Select(m => m.Name));
             AutomationHelper.SetName(tile, mirrored.Count == 0
                 ? $"Display {monitor.Number}, {monitor.Name}"
-                : $"Displays {label.Replace(" | ", " and ", StringComparison.Ordinal)} duplicated, {names}");
+                : $"Displays {label.Replace("|", " and ", StringComparison.Ordinal)} duplicated, {names}");
             if (!ControllerUi.IsActive)
             {
                 ToolTipService.SetToolTip(tile, $"{names}\n{monitor.Width} × {monitor.Height}");
@@ -200,10 +202,14 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
 
         var moving = dragging.ToConfig();
         var others = editor.Monitors.Where(m => m.Enabled && m != dragging).Select(m => m.ToConfig());
-        dragCurrent = LayoutMath.Snap(moving, proposedX, proposedY, others, (int)(SnapDistance / scale));
+        var plan = LayoutMath.PlanMove(moving, proposedX, proposedY, others, (int)(SnapDistance / scale));
+        dragCurrent = (plan.X, plan.Y);
+        dragPlan = plan;
 
-        // Only the tile moves while dragging; the layout is committed on release.
-        Place(tile, dragCurrent);
+        // While dragging, the tile simply follows the pointer and nothing else moves. A marker shows where it would be
+        // inserted between displays; otherwise the tile shows where it would snap to. The layout changes on release.
+        Place(tile, (proposedX, proposedY));
+        ShowMarker(plan);
     }
 
     private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
@@ -216,10 +222,71 @@ public sealed partial class MonitorLayoutView : UserControl, IGamepadHandler
         var monitor = dragging;
         dragging = null;
         tile.ReleasePointerCapture(e.Pointer);
-        if (dragCurrent != dragStartPosition)
+        var shifts = dragPlan?.Shifts ?? [];
+        dragPlan = null;
+        HideMarker();
+        if (dragCurrent != dragStartPosition || shifts.Count > 0)
         {
             monitor.SetPosition(dragCurrent.X, dragCurrent.Y);
+            foreach (var shift in shifts)
+            {
+                editor.Monitors.FirstOrDefault(m => m.Key == shift.Key)?.SetPosition(shift.X, shift.Y);
+            }
+
             editor.NotifyMoved();
+        }
+        else
+        {
+            // Nothing changed: put the tile back where it was.
+            Place(tile, dragStartPosition);
+        }
+    }
+
+    private void ShowMarker(LayoutMath.MovePlan plan)
+    {
+        if (marker is null)
+        {
+            marker = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"],
+                IsHitTestVisible = false,
+                RadiusX = 2,
+                RadiusY = 2,
+            };
+        }
+
+        if (!Surface.Children.Contains(marker))
+        {
+            Surface.Children.Add(marker);
+        }
+
+        if (plan.Marker is { } m)
+        {
+            // An insertion edge: a thick bar along the edge of the display the tile would go next to.
+            const double Thickness = 6;
+            marker.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+            marker.Opacity = 1;
+            marker.Width = m.Width == 0 ? Thickness : Math.Max(1, (m.Width * scale) - TileGap);
+            marker.Height = m.Height == 0 ? Thickness : Math.Max(1, (m.Height * scale) - TileGap);
+            Canvas.SetLeft(marker, (m.X * scale) + originX - (m.Width == 0 ? Thickness / 2 : -(TileGap / 2)));
+            Canvas.SetTop(marker, (m.Y * scale) + originY - (m.Height == 0 ? Thickness / 2 : -(TileGap / 2)));
+        }
+        else if (dragging is { } monitor)
+        {
+            // The place the tile will snap to, outlined.
+            marker.Opacity = 0.35;
+            marker.Width = Math.Max(1, (monitor.Width * scale) - TileGap);
+            marker.Height = Math.Max(1, (monitor.Height * scale) - TileGap);
+            Canvas.SetLeft(marker, (plan.X * scale) + originX + (TileGap / 2));
+            Canvas.SetTop(marker, (plan.Y * scale) + originY + (TileGap / 2));
+        }
+    }
+
+    private void HideMarker()
+    {
+        if (marker is not null)
+        {
+            Surface.Children.Remove(marker);
         }
     }
 
