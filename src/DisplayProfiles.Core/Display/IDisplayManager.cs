@@ -12,4 +12,10 @@ public interface IDisplayManager
 
     /// <summary>Applies the plan atomically; throws <see cref="DisplayApplyException"/> if Windows rejects it.</summary>
     void Apply(ApplyPlan plan);
+
+    /// <summary>
+    /// Turns every duplicated (mirrored) display back into its own part of the extended desktop. Windows lists a
+    /// mirrored display under the one it mirrors, so this has to happen before a layout is placed.
+    /// </summary>
+    void BreakDuplicates();
 }

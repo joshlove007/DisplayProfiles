@@ -67,6 +67,7 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
                 Height = d.Height,
                 RefreshHz = d.RefreshHz,
                 Orientation = d.Orientation,
+                DuplicateOf = d.DuplicateOf,
             });
         }
 
@@ -124,7 +125,7 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
         ApplyPlan plan;
         try
         {
-            plan = ApplyPlanner.Plan(layout, Displays.GetDisplays());
+            plan = PlanFresh(layout);
         }
         catch (DisplayApplyException ex)
         {
@@ -134,25 +135,24 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
         try
         {
             // A sleeping TV can ignore the first requests while Windows still reports success, so retry a few times.
-            List<string> missing = [];
+            string problem = string.Empty;
             for (int attempt = 0; attempt < MaxApplyAttempts; attempt++)
             {
                 Displays.Apply(plan);
-                if (WaitUntilApplied(plan, out missing))
+                if (WaitUntilApplied(plan, out problem))
                 {
                     return new ApplyResult(true, null, plan.Warnings, previous);
                 }
             }
 
-            throw new DisplayApplyException(
-                $"Windows did not turn on {string.Join(", ", missing)}. Check that it is powered on and set to the right input.");
+            throw new DisplayApplyException(problem);
         }
         catch (DisplayApplyException ex)
         {
             string error = ex.Message;
             try
             {
-                Displays.Apply(ApplyPlanner.Plan(previous, Displays.GetDisplays()));
+                Displays.Apply(PlanFresh(previous));
                 error += " Your previous display settings were restored.";
             }
             catch (DisplayApplyException revertEx)
@@ -164,14 +164,37 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
         }
     }
 
+    /// <summary>
+    /// Plans a layout for the displays as they are now. Windows lists a duplicated (mirrored) display under the one it
+    /// mirrors, so existing duplicates are broken up first: after that every connected display shows up on its own.
+    /// The layout is checked before anything is changed.
+    /// </summary>
+    private ApplyPlan PlanFresh(IReadOnlyList<MonitorConfig> layout)
+    {
+        var current = Displays.GetDisplays();
+        var plan = ApplyPlanner.Plan(layout, current);
+
+        // Mirrored monitors can also drop out of Windows' list altogether, so a layout that mirrors something and names a
+        // monitor that isn't listed needs the desktop extended again first.
+        bool missingForMirror = layout.Any(c => c.Enabled && c.IsDuplicate) &&
+            layout.Any(c => c.Enabled && current.All(d => d.Key != c.Key));
+        if (missingForMirror || current.Any(d => d.DuplicateOf is not null))
+        {
+            Displays.BreakDuplicates();
+            plan = ApplyPlanner.Plan(layout, Displays.GetDisplays());
+        }
+
+        return plan;
+    }
+
     /// <summary>How long to let Windows settle before checking that the monitors really came up.</summary>
     public TimeSpan SettleDelay { get; init; } = TimeSpan.FromMilliseconds(1500);
 
     private const int MaxApplyAttempts = 3;
 
-    private bool WaitUntilApplied(ApplyPlan plan, out List<string> missing)
+    private bool WaitUntilApplied(ApplyPlan plan, out string problem)
     {
-        missing = [];
+        problem = string.Empty;
         for (int attempt = 0; attempt < 3; attempt++)
         {
             if (SettleDelay > TimeSpan.Zero)
@@ -180,14 +203,31 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
             }
 
             var now = Displays.GetDisplays();
-            missing = plan.Place
+            var off = plan.Place
                 .Where(p => !now.Any(d => d.AdapterName == p.AdapterName && d.Attached))
                 .Select(p => p.Config.Name)
                 .ToList();
-            if (missing.Count == 0)
+            var notMirrored = plan.Duplicates
+                .Where(p => !now.Any(d => d.Attached && ((d.Key == p.Key && d.DuplicateOf == p.ParentKey) || (d.Key == p.ParentKey && d.DuplicateOf == p.Key))))
+                .Select(p => $"{p.Name} on {p.ParentName}")
+                .ToList();
+            if (off.Count == 0 && notMirrored.Count == 0)
             {
                 return true;
             }
+
+            var parts = new List<string>();
+            if (off.Count > 0)
+            {
+                parts.Add($"Windows did not turn on {string.Join(", ", off)}. Check that it is powered on and set to the right input.");
+            }
+
+            if (notMirrored.Count > 0)
+            {
+                parts.Add($"Windows could not duplicate {string.Join(", ", notMirrored)}.");
+            }
+
+            problem = string.Join(" ", parts);
         }
 
         return false;

@@ -5,6 +5,20 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Each display has a **Multiple displays** setting: keep the default "Extend desktop to this display", or choose "Duplicate
+  display N" to show the same picture as another display. Duplicates work in profiles, from the command line, the widget and
+  Xbox mode. The map shows a mirrored pair as one tile such as "1 | 3".
+- Start with Windows is on by default for new installs.
+- A single MSIX package for x64 and ARM64 that contains the app and the Xbox Game Bar widget. It is signed with Azure Artifact
+  Signing, so it installs with a double-click and no certificate to import. Start with Windows, the `displayprofiles:` link,
+  the command line (`DisplayProfiles.exe`) and shortcuts use the package's own mechanisms.
+
+### Changed
+
+- The MSIX package replaces the installers, the portable zips and the separate widget package.
+- The app's `App.xaml` is now `MainApp.xaml`, and the widget builds on .NET 11.
 ## [0.1.0-beta.3]
 
 ### Added

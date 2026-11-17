@@ -3,7 +3,7 @@
   <!-- CsWinRT projection of the Microsoft.Gaming.XboxGameBar winmd. The NuGet package only ships uap10.0
        metadata, which .NET 5+ can't reference directly. -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetFramework>net11.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseUwp>true</UseUwp>
     <AssemblyName>Microsoft.Gaming.XboxGameBar.Projection</AssemblyName>

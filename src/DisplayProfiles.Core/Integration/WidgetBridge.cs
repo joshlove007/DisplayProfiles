@@ -35,12 +35,18 @@ public static class WidgetBridge
 {
     public const string UriScheme = "displayprofiles";
     public const string PackageNamePrefix = "DisplayProfiles.GameBarWidget_";
+    public const string CombinedPackageNamePrefix = "DisplayProfiles_";
     public const string SnapshotFileName = "profiles.json";
     public const string ClassesKeyPath = @"Software\Classes";
 
     /// <summary>The widget package's LocalState folder, or null if the widget isn't installed.</summary>
     public static string? FindWidgetDataFolder()
     {
+        if (PackageIdentity.LocalStateFolder is { } own)
+        {
+            return own;
+        }
+
         string packages = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
         if (!Directory.Exists(packages))
@@ -48,7 +54,8 @@ public static class WidgetBridge
             return null;
         }
 
-        string? package = Directory.EnumerateDirectories(packages, PackageNamePrefix + "*").FirstOrDefault();
+        string? package = Directory.EnumerateDirectories(packages, CombinedPackageNamePrefix + "*").FirstOrDefault()
+            ?? Directory.EnumerateDirectories(packages, PackageNamePrefix + "*").FirstOrDefault();
         return package is null ? null : Path.Combine(package, "LocalState");
     }
 
@@ -117,6 +124,11 @@ public static class WidgetBridge
     /// <summary>Registers the <c>displayprofiles:</c> URI for the current user so the widget can launch the app.</summary>
     public static void EnsureProtocolRegistered(string exePath, string classesKeyPath = ClassesKeyPath)
     {
+        if (PackageIdentity.IsPackaged)
+        {
+            return; // Declared in the package manifest.
+        }
+
         string command = $"\"{exePath}\" \"%1\"";
         using var root = Registry.CurrentUser.CreateSubKey($@"{classesKeyPath}\{UriScheme}");
         using var open = root.CreateSubKey(@"shell\open\command");

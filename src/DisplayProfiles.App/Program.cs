@@ -4,6 +4,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.Win32.SafeHandles;
 using Microsoft.Windows.AppLifecycle;
 using DisplayProfiles.Core.Cli;
+using DisplayProfiles.Core.Integration;
+using Windows.ApplicationModel.Activation;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Storage.FileSystem;
@@ -19,13 +21,18 @@ public static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        if (PackageIdentity.IsPackaged)
+        {
+            args = ArgumentsFromActivation(args);
+        }
+
         int exitCode = RunCommandLine(args);
         if (exitCode != CliRunner.NotHandled)
         {
             return exitCode;
         }
-
-        WinRT.ComWrappersSupport.InitializeComWrappers();
 
         var mainInstance = AppInstance.FindOrRegisterForKey(InstanceKey);
         if (!mainInstance.IsCurrent)
@@ -57,6 +64,21 @@ public static class Program
             GC.KeepAlive(app);
         });
         return 0;
+    }
+
+    /// <summary>
+    /// A packaged app isn't started with the URI or the --background flag on its command line: the displayprofiles:
+    /// link and the Startup task arrive as activation kinds instead. Turn them back into the arguments the rest expects.
+    /// </summary>
+    private static string[] ArgumentsFromActivation(string[] args)
+    {
+        var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+        return activation.Kind switch
+        {
+            ExtendedActivationKind.Protocol when activation.Data is IProtocolActivatedEventArgs protocol => [protocol.Uri.OriginalString],
+            ExtendedActivationKind.StartupTask => [.. args, "--background"],
+            _ => args,
+        };
     }
 
     private static string? ValueAfter(string[] args, string flag)

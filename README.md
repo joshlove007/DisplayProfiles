@@ -31,7 +31,8 @@ a TV for gaming, and an Xbox controller.
 ## Features
 
 - **Profile editor** with a draggable, snapping monitor map like Settings > Display, per-display on/off, main display,
-  resolution, refresh rate and orientation. Edits stay in the editor until you press **Save**, so you can try a layout
+  resolution, refresh rate and orientation, and a choice of extending the desktop or duplicating another display.
+  Edits stay in the editor until you press **Save**, so you can try a layout
   with **Apply** before deciding to keep it.
 - **Safe applying.** The app checks that every monitor really came up (retrying if a TV is slow to wake), restores your
   previous layout if Windows rejects the change, and shows a "Keep these display settings?" prompt when you apply from the app.
@@ -49,21 +50,24 @@ a TV for gaming, and an Xbox controller.
 
 ## Install
 
-Download the latest build from the [Releases](https://github.com/joshlove007/DisplayProfiles/releases) page.
+Download the package for your PC from the [Releases](https://github.com/joshlove007/DisplayProfiles/releases) page:
 
-| File | What it is |
+| File | For |
 |---|---|
-| `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed for the app. It can also install the Xbox Game Bar widget (see below). |
-| `DisplayProfiles-Setup-<version>-arm64.exe` | Installer for Windows on ARM. |
-| `DisplayProfiles-<version>-win-x64-portable.zip` and `...-win-arm64-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
-| `DisplayProfiles-GameBarWidget-<version>.zip` | The Xbox Game Bar widget on its own, for the portable zips and the arm64 build. |
+| `DisplayProfiles-<version>-x64.msix` | Intel and AMD PCs |
+| `DisplayProfiles-<version>-arm64.msix` | Windows on ARM PCs (Snapdragon and similar) |
+
+Double-click the file and choose **Install**. That's all: the package is signed with a Microsoft-trusted certificate, it
+needs no administrator rights and no certificate to import, and it includes the Xbox Game Bar widget, so there is nothing
+else to set up. Updates install over the old version the same way, and **Settings > Apps** removes it, widget included.
+
+Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is included. Display Profiles starts with Windows
+by default so it can react to Xbox mode; turn that off in Settings or in **Task Manager > Startup apps**.
 
 > [!NOTE]
-> The builds are **not code-signed yet**, so Windows SmartScreen may show "Windows protected your PC" the first time you run
-> the installer. Choose **More info > Run anyway**. The releases are built by [GitHub Actions](.github/workflows/release.yml)
-> from the tagged source, so you can compare them with what is in this repository.
-
-Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is included.
+> The releases are built by [GitHub Actions](.github/workflows/release.yml) from the tagged source, so you can compare them
+> with what is in this repository. The ARM64 package is built the same way as the x64 one but hasn't been tried on real
+> ARM hardware yet. Please open an issue if something doesn't work.
 
 ### Xbox Game Bar widget
 
@@ -72,19 +76,9 @@ Requires Windows 11 (or Windows 10 version 2004 or later). The .NET runtime is i
 </p>
 
 The widget lists your profiles inside Game Bar (Win + G) so you can switch with a controller. The active profile is
-marked, and the widget confirms when a switch has finished (or shows what went wrong).
-
-Game Bar widgets have to be installed as a package, and the package is signed with a self-signed certificate, so it has to
-be trusted once. That needs administrator rights, which is why the app itself doesn't ask for them.
-
-- **With the x64 installer,** leave **Install the Xbox Game Bar widget** ticked. It asks for administrator permission once.
-- **Otherwise,** unzip `DisplayProfiles-GameBarWidget-<version>.zip` and run
-  `powershell -ExecutionPolicy Bypass -File .\Install-Widget.ps1` in that folder.
-
-Then open Game Bar, open the widget menu and add **Display Profiles for Xbox Game Bar**. Display Profiles has to be running
-in the background (turn on **Start with Windows** in Settings). The uninstaller removes the widget; to remove it by hand,
-run the script again with `-Uninstall`.
-
+marked, and the widget confirms when a switch has finished (or shows what went wrong). It comes with the package: open
+Game Bar, open the widget menu and add **Display Profiles for Xbox Game Bar**. Display Profiles has to be running in the
+background, which is the case when **Start with Windows** is on.
 ## Using it
 
 1. Open Display Profiles. On first run it creates a profile from your current layout. (If it finds the original
@@ -176,13 +170,15 @@ dotnet run --project src/DisplayProfiles.App
 
 Everything is SDK-style and works with VS Code (C# Dev Kit); `.vscode/tasks.json` has build, test and publish tasks. The
 Game Bar widget is the one project `dotnet build` can't build, because Game Bar needs a UWP XAML app and that compiler ships
-with Visual Studio. With the Visual Studio Build Tools (Universal Windows Platform workload) installed:
+with Visual Studio. With the Visual Studio Build Tools (Universal Windows Platform workload) and the Windows SDK installed,
+this builds the same package the releases contain (signed with a self-signed certificate it creates) and installs it:
 
 ```powershell
-.\tools\Build-Widget.ps1      # builds artifacts\widget\... and creates a self-signed certificate
-.\tools\Install-Widget.ps1    # trusts the certificate (asks for admin once) and installs the package
+.\tools\Build-Package.ps1                                   # builds artifacts\package\DisplayProfiles_<version>_x64.msix
+.\tools\Install-Widget.ps1 -Package <that .msix>            # trusts the certificate (asks for admin once) and installs it
 ```
 
+`.\tools\Build-Widget.ps1` builds just the widget on its own, for working on it.
 ## Repository layout
 
 | Path | Purpose |
@@ -191,8 +187,7 @@ with Visual Studio. With the Visual Studio Build Tools (Universal Windows Platfo
 | `src/DisplayProfiles.App` | WinUI 3 app: editor, tray icon, controller mode |
 | `src/DisplayProfiles.Widget*` | Game Bar widget and its Game Bar SDK projection |
 | `tests/DisplayProfiles.Tests` | xUnit tests |
-| `installer/` | Inno Setup script for the installer |
-| `tools/` | Icon generator and widget build and install scripts |
+| `tools/` | Icon generator and the widget and package build and install scripts |
 | `docs/` | Documentation and screenshots |
 
 ## Contributing

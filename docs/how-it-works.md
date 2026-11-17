@@ -53,6 +53,23 @@ so the command line and the GUI never overwrite each other's edits.
 
 When you apply from the app, a "Keep these display settings?" prompt waits for you and reverts if you do not answer in time.
 
+### Duplicate displays
+
+A display can be set to duplicate another one (`MonitorConfig.DuplicateOf`) instead of extending the desktop. The old
+`ChangeDisplaySettingsEx` API can't express that, so duplicates go through the display-configuration API: in `QueryDisplayConfig`
+terms, a mirrored display is a second path that shares the original's *source* (the picture). `Win32DisplayManager`:
+
+- **Reads** active paths and groups the ones that share a source. Windows only lists one monitor of such a group in its
+  adapter list, so the others are added from the display configuration and marked as duplicates.
+- **Writes** by placing every other display with the normal path first (the duplicate is detached meanwhile, so it can't disturb
+  the layout), then adding a path to the same monitor that uses the original's source, with `SetDisplayConfig`.
+- **Breaks duplicates up** (`SDC_TOPOLOGY_EXTEND`) before applying anything else, because a mirrored display disappears from
+  the adapter list and the normal placement could not find it.
+
+Windows doesn't say which of two mirrored displays is "the original", so a captured layout can name either one. Layouts are
+compared as groups (`LayoutMath.AreEquivalent`), and the profile editor always keeps the choice you made. Both displays have to
+be reachable from the same graphics output; if they are not, Windows refuses and the previous layout is restored.
+
 ## Xbox mode
 
 Windows exposes whether the gaming full-screen experience is active through `IsGamingFullScreenExperienceActive` in
@@ -67,11 +84,16 @@ The widget runs in an AppContainer sandbox, so it cannot read the app's files or
 
 - The app publishes a small snapshot (`profiles.json`: the profile list, the active profile, the last applied profile and
   the last error) into the widget package's own `LocalState` folder.
-- The app registers a `displayprofiles:` URI scheme under `HKCU\Software\Classes`. The widget launches
-  `displayprofiles:apply/<id>`, Windows starts (or signals) the app, and the app applies the profile.
+- The package declares a `displayprofiles:` URI scheme (an unpackaged build registers it under `HKCU\Software\Classes`
+  instead). The widget launches `displayprofiles:apply/<id>`, Windows starts (or signals) the app, and the app applies the profile.
 - The widget watches the snapshot to show "Switching...", then a check mark, or the error if the switch failed.
 
-Because the widget is a package, it is signed. Releases use one self-signed certificate so you only have to trust it once.
+The widget is part of the same MSIX as the app, so it is installed, updated and removed together with it. That is also why
+the app and the widget share the package's `LocalState` folder: the app finds it from its own package identity
+(`PackageIdentity`). Packaged, the app also uses the package for the other things an unpackaged app does through the registry:
+Start with Windows is a startup task, the command line is an execution alias (`DisplayProfiles.exe` works from any terminal),
+and shortcuts point at that alias. One catch: a compiled `App.xbf` in the package root makes the UWP widget crash on start, so
+the app's XAML application class is `MainApp.xaml`.
 
 ## Single instance and the command line
 
@@ -100,5 +122,5 @@ Controller mode is the same app with a different shell:
 ## Releases
 
 Pushing a tag such as `v0.1.0-beta.1` runs the [release workflow](../.github/workflows/release.yml). It runs the tests,
-publishes the app for x64 and arm64, builds the Inno Setup installers (`installer/DisplayProfiles.iss`) and portable zips,
-builds and signs the widget package, and creates the GitHub release. Tags with a suffix are marked as pre-releases.
+builds the Game Bar widget and the app for x64 and arm64 and merges them into one MSIX per architecture
+(`tools/Build-Package.ps1`), signs the packages with Azure Artifact Signing, and creates the GitHub release. Tags with a suffix are marked as pre-releases.

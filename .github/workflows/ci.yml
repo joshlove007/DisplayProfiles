@@ -47,6 +47,10 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Build widget package
+      - name: Build widget package and the combined MSIX (x64 and ARM64)
         shell: pwsh
-        run: ./tools/Build-Widget.ps1
+        run: |
+          foreach ($platform in 'x64', 'ARM64') {
+            ./tools/Build-Widget.ps1 -Platform $platform
+            ./tools/Build-Package.ps1 -Platform $platform -SkipWidgetBuild -NoSign
+          }
