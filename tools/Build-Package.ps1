@@ -6,12 +6,18 @@
     The widget is a UWP app that has to be built with Visual Studio's MSBuild (see Build-Widget.ps1); the app is a
     full-trust WinUI 3 desktop app built with `dotnet publish`. Both target the same .NET runtime, so their files
     merge into one package layout. This script builds both, merges the layouts and manifests, merges the resource
-    indexes with MakePri, then packs and signs with the same self-signed certificate Build-Widget.ps1 uses.
+    indexes with MakePri, then packs it. Unless -NoSign is given, the package is signed with the self-signed certificate
+    Build-Widget.ps1 creates for the default publisher. A release build passes the publisher of its real certificate
+    (it must equal the certificate's subject) and -NoSign, and signs the package in a later step.
 
     Needs the Windows SDK (makeappx, makepri, signtool) plus everything Build-Widget.ps1 needs.
 
 .EXAMPLE
     .\tools\Build-Package.ps1
+
+.EXAMPLE
+    .\tools\Build-Package.ps1 -SkipWidgetBuild -Version 0.1.0.7 -NoSign `
+        -Publisher 'CN=Joshua Lovelace, O=Joshua Lovelace, L=Hendersonville, S=tn, C=US' -PublisherDisplayName 'Joshua Lovelace'
 #>
 [CmdletBinding()]
 param(
@@ -20,7 +26,15 @@ param(
 
     [string]$Version = '0.1.0.0',
 
-    [switch]$SkipWidgetBuild
+    [string]$Name = 'DisplayProfiles',
+
+    [string]$Publisher = 'CN=DisplayProfiles',
+
+    [string]$PublisherDisplayName = 'Display Profiles',
+
+    [switch]$SkipWidgetBuild,
+
+    [switch]$NoSign
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +43,6 @@ $rid = if ($Platform -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
 $widgetDir = Join-Path $repoRoot 'artifacts\widget'
 $outDir = Join-Path $repoRoot 'artifacts\package'
 $stage = Join-Path $repoRoot "artifacts\package-stage\$Platform"
-$publisher = 'CN=DisplayProfiles'
 
 $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
     Where-Object { $_.Name -match '^10\.' -and (Test-Path (Join-Path $_.FullName 'x64\makeappx.exe')) } |
@@ -74,10 +87,11 @@ $uri = @{
 foreach ($prefix in 'desktop', 'rescap', 'uap5') { $package.SetAttribute("xmlns:$prefix", $uri[$prefix]) }
 $package.SetAttribute('IgnorableNamespaces', "$($package.GetAttribute('IgnorableNamespaces')) desktop rescap uap5".Trim())
 
-$package.Identity.Name = 'DisplayProfiles'
-$package.Identity.Publisher = $publisher
+$package.Identity.Name = $Name
+$package.Identity.Publisher = $Publisher
 $package.Identity.Version = $Version
 $package.Properties.DisplayName = 'Display Profiles'
+$package.Properties.PublisherDisplayName = $PublisherDisplayName
 
 # Full-trust apps need the desktop device family.
 foreach ($family in @($package.Dependencies.TargetDeviceFamily | Where-Object Name -eq 'Windows.Universal')) {
@@ -142,9 +156,14 @@ $msix = Join-Path $outDir "DisplayProfiles_${Version}_$Platform.msix"
 & (Join-Path $tools 'makeappx.exe') pack /d $stage /p $msix /o | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'makeappx pack failed.' }
 
+if ($NoSign) {
+    Write-Host "`nUnsigned package written to $msix" -ForegroundColor Yellow
+    return
+}
+
 $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
-    Where-Object Subject -eq $publisher | Sort-Object NotAfter -Descending | Select-Object -First 1
-if (-not $cert) { throw "No code-signing certificate for '$publisher'. Run Build-Widget.ps1 once to create it." }
+    Where-Object Subject -eq $Publisher | Sort-Object NotAfter -Descending | Select-Object -First 1
+if (-not $cert) { throw "No code-signing certificate for '$Publisher'. Run Build-Widget.ps1 once to create it, or use -NoSign." }
 & (Join-Path $tools 'signtool.exe') sign /fd SHA256 /sha1 $cert.Thumbprint $msix | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'signtool sign failed.' }
 Export-Certificate -Cert $cert -FilePath ([IO.Path]::ChangeExtension($msix, '.cer')) | Out-Null

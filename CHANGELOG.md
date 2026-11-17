@@ -5,6 +5,16 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A single MSIX package that contains the app and the Xbox Game Bar widget (x64). It is signed with Azure Artifact Signing, so
+  it installs without importing a certificate. Start with Windows, the `displayprofiles:` link, the command line and the
+  shortcuts use the package's own mechanisms when packaged.
+
+### Changed
+
+- The app's `App.xaml` is now `MainApp.xaml`, and the widget builds on .NET 11.
+
 ## [0.1.0-beta.3]
 
 ### Added

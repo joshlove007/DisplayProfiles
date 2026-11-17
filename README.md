@@ -53,13 +53,14 @@ Download the latest build from the [Releases](https://github.com/joshlove007/Dis
 
 | File | What it is |
 |---|---|
+| `DisplayProfiles-<version>-x64.msix` | The app and the Xbox Game Bar widget in one signed package. Double-click it and choose **Install**; there is nothing else to set up. Don't combine it with the installer or the widget zip below. |
 | `DisplayProfiles-Setup-<version>-x64.exe` | Installer for Intel and AMD PCs. Per user, no administrator rights needed for the app. It can also install the Xbox Game Bar widget (see below). |
 | `DisplayProfiles-Setup-<version>-arm64.exe` | Installer for Windows on ARM. |
 | `DisplayProfiles-<version>-win-x64-portable.zip` and `...-win-arm64-portable.zip` | The same app without an installer. Unzip anywhere and run `DisplayProfiles.exe`. |
 | `DisplayProfiles-GameBarWidget-<version>.zip` | The Xbox Game Bar widget on its own, for the portable zips and the arm64 build. |
 
 > [!NOTE]
-> The builds are **not code-signed yet**, so Windows SmartScreen may show "Windows protected your PC" the first time you run
+> The `.msix` is signed with a Microsoft-trusted certificate, but the installers, zips and widget package are **not code-signed**, so Windows SmartScreen may show "Windows protected your PC" the first time you run
 > the installer. Choose **More info > Run anyway**. The releases are built by [GitHub Actions](.github/workflows/release.yml)
 > from the tagged source, so you can compare them with what is in this repository.
 

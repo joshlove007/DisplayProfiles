@@ -13,10 +13,13 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: windows-latest
+    # Matches the Azure federated credential's subject (…:environment:release), which is what lets this job sign in.
+    environment: release
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
@@ -89,6 +92,42 @@ jobs:
           }
           Copy-Item artifacts/installer/*.exe .
 
+      # The app and the Game Bar widget in one MSIX. The publisher must equal the Artifact Signing certificate's subject.
+      # The package version's last part is the run number so that every build installs over the previous one.
+      - name: Build the combined MSIX
+        shell: pwsh
+        run: |
+          ./tools/Build-Package.ps1 -SkipWidgetBuild -NoSign -Version "${{ steps.version.outputs.number }}.${{ github.run_number }}" `
+            -Publisher 'CN=Joshua Lovelace, O=Joshua Lovelace, L=Hendersonville, S=tn, C=US' -PublisherDisplayName 'Joshua Lovelace'
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign the MSIX with Artifact Signing
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: JoshLoveSigning
+          certificate-profile-name: DisplayProfiles
+          files-folder: ${{ github.workspace }}\artifacts\package
+          files-folder-filter: msix
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Check the signature and name the file
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem artifacts/package -Filter '*.msix' | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $msix.FullName
+          "$($signature.Status): $($signature.SignerCertificate.Subject)"
+          if ($signature.Status -ne 'Valid') { throw "The MSIX signature is $($signature.Status): $($signature.StatusMessage)" }
+          Copy-Item $msix.FullName "DisplayProfiles-${{ steps.version.outputs.full }}-x64.msix"
+
       - name: Create the release
         shell: pwsh
         env:
@@ -96,5 +135,5 @@ jobs:
         run: |
           $args = @('release', 'create', $env:TAG, '--title', "Display Profiles ${{ steps.version.outputs.full }}", '--generate-notes', '--verify-tag')
           if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
-          $args += (Get-ChildItem *.zip, DisplayProfiles-Setup-*.exe | ForEach-Object Name)
+          $args += (Get-ChildItem *.zip, DisplayProfiles-Setup-*.exe, DisplayProfiles-*.msix | ForEach-Object Name)
           gh @args
