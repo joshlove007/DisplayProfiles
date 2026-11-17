@@ -233,6 +233,40 @@ public class ProfileServiceTests : IDisposable
     }
 
     [Fact]
+    public void A_monitor_windows_left_out_of_its_list_is_found_again_by_extending_first()
+    {
+        var hidden = new List<DisplayInfo>
+        {
+            Disp("ASUS", @"\\.\DISPLAY1", attached: true, primary: true),
+            Disp("SAM", string.Empty, attached: false),
+        };
+        var fake = new FakeDisplayManager(hidden);
+        var service = Create(fake);
+
+        var result = service.Apply(Profile.Create("Both", [Mon("ASUS", 0, 0, primary: true), Mon("SAM", 2560, 0)]));
+
+        Assert.True(result.Success);
+        Assert.Equal(1, fake.BreakDuplicatesCalls);
+        Assert.Equal(2, service.CaptureLayout().Count(m => m.Enabled));
+    }
+
+    [Fact]
+    public void Applying_a_layout_that_does_not_need_the_hidden_monitor_does_not_extend()
+    {
+        var hidden = new List<DisplayInfo>
+        {
+            Disp("ASUS", @"\\.\DISPLAY1", attached: true, primary: true),
+            Disp("SAM", string.Empty, attached: false),
+        };
+        var fake = new FakeDisplayManager(hidden);
+        var service = Create(fake);
+
+        var result = service.Apply(Profile.Create("One", [Mon("ASUS", 0, 0, primary: true), Mon("SAM", 0, 0, enabled: false)]));
+
+        Assert.True(result.Success);
+        Assert.Equal(0, fake.BreakDuplicatesCalls);
+    }
+    [Fact]
     public void Apply_fails_and_reverts_when_a_display_never_mirrors()
     {
         var fake = new FakeDisplayManager(Desk()) { SilentlyIgnoreFirstCalls = 3 };

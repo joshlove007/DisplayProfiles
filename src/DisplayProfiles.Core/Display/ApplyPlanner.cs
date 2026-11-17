@@ -26,6 +26,9 @@ public static class ApplyPlanner
     public static ApplyPlan Plan(IReadOnlyList<MonitorConfig> desired, IReadOnlyList<DisplayInfo> connected)
     {
         var warnings = new List<string>();
+
+        // A monitor Windows hasn't given an adapter (see Win32DisplayManager) can't be placed.
+        connected = [.. connected.Where(d => d.AdapterName.Length > 0)];
         var byKey = connected.ToDictionary(d => d.Key, StringComparer.Ordinal);
 
         var present = new List<MonitorConfig>();

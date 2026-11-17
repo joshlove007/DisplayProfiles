@@ -38,6 +38,12 @@ internal sealed class FakeDisplayManager(List<DisplayInfo> displays) : IDisplayM
         BreakDuplicatesCalls++;
         for (int i = 0; i < displays.Count; i++)
         {
+            if (displays[i].AdapterName.Length == 0)
+            {
+                // Extending the desktop again makes Windows list a hidden monitor properly.
+                displays[i] = displays[i] with { AdapterName = $@"\\.\DISPLAY{i + 10}" };
+            }
+
             if (displays[i].DuplicateOf is not null)
             {
                 displays[i] = displays[i] with { DuplicateOf = null, Attached = false, Width = 0, Height = 0, RefreshHz = 0 };
