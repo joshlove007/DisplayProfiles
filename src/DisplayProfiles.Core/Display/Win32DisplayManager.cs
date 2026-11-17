@@ -12,7 +12,7 @@ namespace DisplayProfiles.Core.Display;
 /// </summary>
 public sealed unsafe class Win32DisplayManager : IDisplayManager
 {
-    public IReadOnlyList<DisplayInfo> GetDisplays() => [.. Snapshot().Select(s => s.Info)];
+    public IReadOnlyList<DisplayInfo> GetDisplays() => [.. Snapshot().Select(s => s.Info with { DevicePath = s.DevicePath })];
 
     /// <summary>Every connected monitor with its device path (the same path CCD reports for its target).</summary>
     private static List<(string DevicePath, DisplayInfo Info)> Snapshot()
@@ -68,14 +68,31 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
         return DisambiguateKeys(AddHidden(MarkMirrored(CollapseDuplicateOutputs(found))));
     }
 
-    public IReadOnlyList<DisplayMode> GetModes(string adapterName)
+    public IReadOnlyList<DisplayMode> GetModes(DisplayInfo display)
+    {
+        var modes = new HashSet<DisplayMode>(EnumerateModes(display.AdapterName));
+
+        // Windows lists a monitor's modes through the output that drives it. For one that is off the desktop that is a short
+        // generic list, and for one Windows doesn't list at all it is nothing, so add what the monitor says it supports.
+        if (!display.Attached || modes.Count == 0)
+        {
+            modes.UnionWith(EdidModes.Parse(ReadEdid(display.DevicePath)));
+        }
+
+        return modes
+            .OrderByDescending(m => (long)m.Width * m.Height)
+            .ThenByDescending(m => m.RefreshHz)
+            .ToList();
+    }
+
+    private static List<DisplayMode> EnumerateModes(string adapterName)
     {
         if (adapterName.Length == 0)
         {
             return [];
         }
 
-        var modes = new HashSet<DisplayMode>();
+        var modes = new List<DisplayMode>();
         var dm = NewDevMode();
         for (int i = 0; PInvoke.EnumDisplaySettings(adapterName, (ENUM_DISPLAY_SETTINGS_MODE)i, ref dm); i++)
         {
@@ -87,10 +104,28 @@ public sealed unsafe class Win32DisplayManager : IDisplayManager
             dm = NewDevMode();
         }
 
-        return modes
-            .OrderByDescending(m => (long)m.Width * m.Height)
-            .ThenByDescending(m => m.RefreshHz)
-            .ToList();
+        return modes;
+    }
+
+    // \\?\DISPLAY#GSMC0C8#5&9161298&0&UID4352#{guid}  ->  HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY\GSMC0C8\5&9161298&0&UID4352
+    private static byte[] ReadEdid(string devicePath)
+    {
+        string[] parts = devicePath.Split('#');
+        if (parts.Length < 3 || !devicePath.StartsWith(@"\\?\DISPLAY#", StringComparison.OrdinalIgnoreCase))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                $@"SYSTEM\CurrentControlSet\Enum\DISPLAY\{parts[1]}\{parts[2]}\Device Parameters");
+            return key?.GetValue("EDID") as byte[] ?? [];
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return [];
+        }
     }
 
     public void Apply(ApplyPlan plan)

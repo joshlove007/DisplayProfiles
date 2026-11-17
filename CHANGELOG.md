@@ -5,10 +5,18 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta.7]
+
 ### Changed
 
 - The release workflow also builds the unsigned Microsoft Store bundle and keeps it as a run artifact, so it no longer has to be built by hand.
   Running the workflow again for a tag that already has a release now builds only the Store bundle instead of failing.
+
+### Fixed
+
+- A display that isn't on the desktop (the TV while the Desk profile is active) only offered one resolution, or a short generic
+  list, in the editor. The resolution and refresh rate lists now also include what the monitor says it supports (read from its
+  EDID), so a TV shows 4K and its higher refresh rates even while it is switched off.
 
 ## [0.1.0-beta.6]
 

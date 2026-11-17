@@ -29,7 +29,7 @@ internal sealed class FakeDisplayManager(List<DisplayInfo> displays) : IDisplayM
 
     public IReadOnlyList<DisplayInfo> GetDisplays() => displays;
 
-    public IReadOnlyList<DisplayMode> GetModes(string adapterName) => [new DisplayMode(3840, 2160, 60)];
+    public IReadOnlyList<DisplayMode> GetModes(DisplayInfo display) => [new DisplayMode(3840, 2160, 60)];
 
     public int BreakDuplicatesCalls { get; private set; }
 

@@ -160,7 +160,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             double right = configs.Where(c => c.Enabled).Select(c => (double)c.Right).DefaultIfEmpty(0).Max();
             foreach (var display in displays.Where(d => configs.All(c => c.Key != d.Key)))
             {
-                var best = service.Displays.GetModes(display.AdapterName).Cast<DisplayMode?>().FirstOrDefault();
+                var best = service.Displays.GetModes(display).Cast<DisplayMode?>().FirstOrDefault();
                 configs.Add(new MonitorConfig
                 {
                     Key = display.Key,
@@ -176,7 +176,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             foreach (var config in MonitorList.Order(configs, displays))
             {
                 var display = displays.FirstOrDefault(d => d.Key == config.Key);
-                var modes = display is null ? [] : service.Displays.GetModes(display.AdapterName);
+                var modes = display is null ? [] : service.Displays.GetModes(display);
                 var monitor = new MonitorViewModel(config, 0, display is not null, modes);
                 monitor.PropertyChanged += OnMonitorChanged;
                 all.Add(monitor);

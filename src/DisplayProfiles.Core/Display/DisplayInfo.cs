@@ -8,6 +8,9 @@ public sealed record DisplayInfo
     /// <summary>GDI device name such as \\.\DISPLAY3.</summary>
     public required string AdapterName { get; init; }
 
+    /// <summary>The monitor's device-interface path (empty when unknown); locates its EDID in the registry.</summary>
+    public string DevicePath { get; init; } = string.Empty;
+
     public required string Key { get; init; }
 
     public required string FriendlyName { get; init; }
