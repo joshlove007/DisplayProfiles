@@ -127,7 +127,9 @@ builds the Game Bar widget and the app for x64 and arm64 and merges them into on
 
 ### Microsoft Store
 
-The Store signs packages itself and gives them their own identity, so it gets a separate, unsigned build:
-`.\tools\Build-StorePackage.ps1` makes one `.msixbundle` (x64 and arm64) with the name and publisher from Partner Center. The last
-part of the Store version must be 0. The listing text, certification notes and screenshots for Partner Center are in
+The Store signs packages itself and gives them their own identity, so it gets a separate, unsigned build. The release workflow's
+`store` job makes it for every tag: one `.msixbundle` (x64 and arm64) with the name and publisher from Partner Center, uploaded as the run's
+`store-bundle-<version>` artifact (kept for 90 days). Download it with `gh run download <run id> -n store-bundle-<version>`, or from the run's page
+on GitHub. The Store reserves the last part of the version (it must be 0) and the first three parts must go up with every submission, so the
+version is `<major>.<minor>.<run number>.0`. To build one locally, run `.\tools\Build-StorePackage.ps1 -Version <x.y.z.0>`. The listing text, certification notes and screenshots for Partner Center are in
 [docs/store](store/listing.md).

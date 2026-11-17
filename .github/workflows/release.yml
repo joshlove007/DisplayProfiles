@@ -98,3 +98,36 @@ jobs:
           if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
           $args += (Get-ChildItem DisplayProfiles-*.msix | ForEach-Object Name)
           gh @args
+
+  # The Microsoft Store signs packages itself and gives them their own identity, so it gets a separate, unsigned bundle.
+  # Download it from this run's artifacts (gh run download) and upload it in Partner Center.
+  store:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build the Store bundle (x64 and ARM64)
+        id: bundle
+        shell: pwsh
+        run: |
+          if ($env:TAG -notmatch '^v(\d+)\.(\d+)\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Tag '$env:TAG' is not like v1.2.3 or v1.2.3-beta.1" }
+          # The Store reserves the last part of the version (it must be 0) and needs the first three to go up with every
+          # submission, so the third part is the run number.
+          $version = "$($Matches[1]).$($Matches[2]).${{ github.run_number }}.0"
+          ./tools/Build-StorePackage.ps1 -Version $version
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: store-bundle-${{ steps.bundle.outputs.version }}
+          path: artifacts/store/*.msixbundle
+          if-no-files-found: error
+          retention-days: 90
