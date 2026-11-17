@@ -75,7 +75,7 @@ public sealed class ProfileService(IDisplayManager displays, ProfileStore store)
         foreach (var d in connected.Where(d => !d.Attached))
         {
             // A disabled monitor still needs a sensible size so it can be switched on from the editor.
-            var best = Displays.GetModes(d.AdapterName).Cast<DisplayMode?>().FirstOrDefault();
+            var best = Displays.GetModes(d).Cast<DisplayMode?>().FirstOrDefault();
             layout.Add(new MonitorConfig
             {
                 Key = d.Key,

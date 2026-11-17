@@ -5,10 +5,27 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta.7]
+
 ### Changed
 
 - The release workflow also builds the unsigned Microsoft Store bundle and keeps it as a run artifact, so it no longer has to be built by hand.
   Running the workflow again for a tag that already has a release now builds only the Store bundle instead of failing.
+
+### Fixed
+
+- Changing a setting and then changing it back no longer leaves the profile marked as unsaved. The editor compares your edits
+  with the saved profile, so Save stays off and switching profiles doesn't ask about changes that aren't there.
+- On laptops with two graphics chips, Windows can name the wrong monitor for an output: an output that was driving the TV
+  was reported as the laptop's own panel. The editor then showed the TV's resolution and settings on the panel, listed the
+  TV as not connected, and Identify put the wrong number on the TV. Display Profiles now asks the display configuration
+  which monitor each active output really shows.
+- A display that isn't on the desktop (the TV while the Desk profile is active) only offered one resolution, or a short generic
+  list, in the editor. Windows only reports a monitor's full list while the monitor is on the desktop, so Display Profiles now
+  remembers the list each monitor had the last time it was on (`modes.json` next to your profiles) and shows it while the
+  monitor is off. A monitor it has never seen on the desktop falls back to what the monitor says it supports (its EDID).
+- Refresh rates are named like Windows Settings: 119.88, 59.94, 29.97 and 23.98 Hz instead of 119, 59, 29 and 23. The
+  resolution list is sorted the same way as Windows too (widest first).
 
 ## [0.1.0-beta.6]
 

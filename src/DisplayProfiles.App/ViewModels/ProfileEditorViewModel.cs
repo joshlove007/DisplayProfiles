@@ -34,6 +34,9 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     private IReadOnlyList<DisplayInfo> displays = [];
     private bool loading;
 
+    // The selected profile as it was when it was loaded or last saved; edits are compared with it to know if they matter.
+    private Profile? baseline;
+
     public ProfileEditorViewModel(ProfileService service)
     {
         this.service = service;
@@ -160,7 +163,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             double right = configs.Where(c => c.Enabled).Select(c => (double)c.Right).DefaultIfEmpty(0).Max();
             foreach (var display in displays.Where(d => configs.All(c => c.Key != d.Key)))
             {
-                var best = service.Displays.GetModes(display.AdapterName).Cast<DisplayMode?>().FirstOrDefault();
+                var best = service.Displays.GetModes(display).Cast<DisplayMode?>().FirstOrDefault();
                 configs.Add(new MonitorConfig
                 {
                     Key = display.Key,
@@ -176,7 +179,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             foreach (var config in MonitorList.Order(configs, displays))
             {
                 var display = displays.FirstOrDefault(d => d.Key == config.Key);
-                var modes = display is null ? [] : service.Displays.GetModes(display.AdapterName);
+                var modes = display is null ? [] : service.Displays.GetModes(display);
                 var monitor = new MonitorViewModel(config, 0, display is not null, modes);
                 monitor.PropertyChanged += OnMonitorChanged;
                 all.Add(monitor);
@@ -347,6 +350,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     {
         var edited = BuildProfile();
         bool wasDirty = IsDirty;
+        var savedBaseline = baseline;
         displays = service.Displays.GetDisplays();
         var selected = SelectedMonitor?.Key;
         LoadMonitors(edited ?? service.Data.Profiles.FirstOrDefault(p => p.Id == SelectedProfile?.Id));
@@ -357,6 +361,8 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
 
         if (wasDirty && SelectedProfile is { } item)
         {
+            // Loading the edits made them the new "saved" state; the real one is still the one on disk.
+            baseline = savedBaseline;
             IsDirty = true;
             item.IsDirty = true;
         }
@@ -670,8 +676,10 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
             return;
         }
 
-        IsDirty = true;
-        SelectedProfile.IsDirty = true;
+        // Putting everything back the way it was saved isn't a change.
+        bool changed = baseline is null || BuildProfile() is not { } current || !current.HasSameContentAs(baseline);
+        IsDirty = changed;
+        SelectedProfile.IsDirty = changed;
     }
 
     private void MarkClean()
@@ -681,6 +689,8 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         {
             item.IsDirty = false;
         }
+
+        baseline = BuildProfile();
     }
 
     /// <summary>The profile as currently edited, saved or not.</summary>
@@ -717,6 +727,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         loading = false;
         IsDirty = false;
         item.IsDirty = false;
+        baseline = profile;
         RefreshActive();
         return true;
     }
