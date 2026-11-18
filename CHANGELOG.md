@@ -5,6 +5,11 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Each release has a signed `DisplayProfiles-<version>.msixbundle` with the x64 and ARM64 packages in one file, next to the two
+  separate packages.
+
 ### Changed
 
 - The unsigned Microsoft Store bundle is now attached to each GitHub release (named `...-store-<version>.msixbundle`, for

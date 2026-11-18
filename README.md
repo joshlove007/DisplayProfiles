@@ -60,6 +60,7 @@ Download the package for your PC from the [Releases](https://github.com/joshlove
 
 | File | For |
 |---|---|
+| `DisplayProfiles-<version>.msixbundle` | Any PC: x64 and ARM64 in one file, Windows picks the right one |
 | `DisplayProfiles-<version>-x64.msix` | Intel and AMD PCs |
 | `DisplayProfiles-<version>-arm64.msix` | Windows on ARM PCs (Snapdragon and similar) |
 
@@ -79,8 +80,9 @@ by default so it can react to Xbox mode; turn that off in Settings or in **Task 
 > [!NOTE]
 > The releases are built by [GitHub Actions](.github/workflows/release.yml) from the tagged source, so you can compare them
 > with what is in this repository. Each release also carries an unsigned `...-store-...msixbundle`: that is the package
-> submitted to the Microsoft Store (which signs it itself), so you don't need it to install. The ARM64 package is built the
-> same way as the x64 one but hasn't been tried on real ARM hardware yet. Please open an issue if something doesn't work.
+> submitted to the Microsoft Store (which signs it itself, under its own identity), so you don't need it to install. The ARM64
+> package is built the same way as the x64 one but hasn't been tried on real ARM hardware yet. Please open an issue if
+> something doesn't work.
 
 ### Xbox Game Bar widget
 

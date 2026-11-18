@@ -123,14 +123,14 @@ Controller mode is the same app with a different shell:
 
 Pushing a tag such as `v0.1.0-beta.1` runs the [release workflow](../.github/workflows/release.yml). It runs the tests,
 builds the Game Bar widget and the app for x64 and arm64 and merges them into one MSIX per architecture
-(`tools/Build-Package.ps1`), signs the packages with Azure Artifact Signing, and creates the GitHub release. Tags with a suffix are marked as pre-releases.
+(`tools/Build-Package.ps1`), signs the packages with Azure Artifact Signing, combines them into one signed `.msixbundle`, and creates the GitHub release. Tags with a suffix are marked as pre-releases.
 
 ### Microsoft Store
 
 The Store signs packages itself and gives them their own identity, so it gets a separate, unsigned build. The release workflow's
 `store` job makes it for every tag: one `.msixbundle` (x64 and arm64) with the name and publisher from Partner Center. It is attached to
 the GitHub release as `DisplayProfiles-<tag>-store-<version>.msixbundle` (to upload in Partner Center; it is unsigned, so it isn't
-meant to be installed) and also kept as the run's `store-bundle-<version>` artifact for 90 days. The Store reserves the last part of the
+meant to be installed) and also kept as the run's `store-bundle-<version>` artifact for 90 days. It stays unsigned because a package can only be signed by a certificate whose subject matches its publisher, and the Store identity (`CN=73CB8E95-…`) isn't ours to sign; the Store signs it after upload. The Store reserves the last part of the
 version (it must be 0) and the first three parts must go up with every submission, so the version is
 `<major>.<minor>.<run number>.0`. To build one locally, run `.\tools\Build-StorePackage.ps1 -Version <x.y.z.0>`. The listing text,
 certification notes and screenshots for Partner Center are in [docs/store](store/listing.md).

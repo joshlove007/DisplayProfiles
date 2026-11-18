@@ -109,6 +109,41 @@ jobs:
             Copy-Item $msix.FullName "DisplayProfiles-${{ steps.version.outputs.full }}-$($platform.ToLower()).msix"
           }
 
+      # One file for both architectures: the signed packages combined into a bundle, which is signed as well.
+      - name: Bundle the signed packages
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
+            Where-Object { $_.Name -match '^10\.' -and (Test-Path (Join-Path $_.FullName 'x64\makeappx.exe')) } |
+            Sort-Object { [version]$_.Name } | Select-Object -Last 1
+          $bundleInput = 'artifacts/bundle-input'
+          New-Item -ItemType Directory $bundleInput, artifacts/bundle -Force | Out-Null
+          foreach ($platform in 'x64', 'ARM64') {
+            Copy-Item (Get-ChildItem artifacts/package -Filter "*_$platform.msix").FullName $bundleInput
+          }
+          & (Join-Path $sdk.FullName 'x64\makeappx.exe') bundle /d $bundleInput /bv "${{ steps.version.outputs.number }}.${{ github.run_number }}" /p artifacts/bundle/DisplayProfiles.msixbundle /o
+          if ($LASTEXITCODE -ne 0) { throw 'makeappx bundle failed.' }
+
+      - name: Sign the bundle with Artifact Signing
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: JoshLoveSigning
+          certificate-profile-name: DisplayProfiles
+          files-folder: ${{ github.workspace }}\artifacts\bundle
+          files-folder-filter: msixbundle
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Check the bundle signature
+        shell: pwsh
+        run: |
+          $signature = Get-AuthenticodeSignature artifacts/bundle/DisplayProfiles.msixbundle
+          "bundle : $($signature.Status): $($signature.SignerCertificate.Subject)"
+          if ($signature.Status -ne 'Valid') { throw "The bundle signature is $($signature.Status): $($signature.StatusMessage)" }
+          Copy-Item artifacts/bundle/DisplayProfiles.msixbundle "DisplayProfiles-${{ steps.version.outputs.full }}.msixbundle"
+
       - name: Create the release
         shell: pwsh
         env:
@@ -116,7 +151,7 @@ jobs:
         run: |
           $args = @('release', 'create', $env:TAG, '--title', "Display Profiles ${{ steps.version.outputs.full }}", '--generate-notes', '--verify-tag')
           if ('${{ steps.version.outputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
-          $args += (Get-ChildItem DisplayProfiles-*.msix | ForEach-Object Name)
+          $args += (Get-ChildItem DisplayProfiles-* -Include *.msix, *.msixbundle | ForEach-Object Name)
           gh @args
 
   # The Microsoft Store signs packages itself and gives them their own identity, so it gets a separate, unsigned bundle.
