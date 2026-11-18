@@ -78,8 +78,9 @@ by default so it can react to Xbox mode; turn that off in Settings or in **Task 
 
 > [!NOTE]
 > The releases are built by [GitHub Actions](.github/workflows/release.yml) from the tagged source, so you can compare them
-> with what is in this repository. The ARM64 package is built the same way as the x64 one but hasn't been tried on real
-> ARM hardware yet. Please open an issue if something doesn't work.
+> with what is in this repository. Each release also carries an unsigned `...-store-...msixbundle`: that is the package
+> submitted to the Microsoft Store (which signs it itself), so you don't need it to install. The ARM64 package is built the
+> same way as the x64 one but hasn't been tried on real ARM hardware yet. Please open an issue if something doesn't work.
 
 ### Xbox Game Bar widget
 

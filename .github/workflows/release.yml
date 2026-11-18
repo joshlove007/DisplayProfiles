@@ -120,11 +120,15 @@ jobs:
           gh @args
 
   # The Microsoft Store signs packages itself and gives them their own identity, so it gets a separate, unsigned bundle.
-  # Download it from this run's artifacts (gh run download) and upload it in Partner Center.
+  # It is attached to the GitHub release (to upload in Partner Center, not to install) and kept as a run artifact.
   store:
+    needs: release
+    # Runs after the release job, and also when that job was skipped because the release already exists.
+    if: ${{ !cancelled() && needs.release.result != 'failure' }}
     runs-on: windows-latest
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -151,3 +155,15 @@ jobs:
           path: artifacts/store/*.msixbundle
           if-no-files-found: error
           retention-days: 90
+
+      - name: Attach the bundle to the release
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem artifacts/store -Filter *.msixbundle | Select-Object -First 1
+          $name = "DisplayProfiles-$($env:TAG.TrimStart('v'))-store-${{ steps.bundle.outputs.version }}.msixbundle"
+          Copy-Item $bundle.FullName $name
+          # A re-run replaces the earlier bundle instead of adding another one.
+          foreach ($old in (gh release view $env:TAG --json assets -q '.assets[].name' | Where-Object { $_ -like '*-store-*.msixbundle' })) {
+            gh release delete-asset $env:TAG $old --yes
+          }
+          gh release upload $env:TAG $name
