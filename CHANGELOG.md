@@ -5,6 +5,11 @@ project uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The unsigned Microsoft Store bundle is now attached to each GitHub release (named `...-store-<version>.msixbundle`, for
+  uploading in Partner Center, not for installing) as well as kept as a run artifact.
+
 ## [0.1.0-beta.7]
 
 ### Changed
